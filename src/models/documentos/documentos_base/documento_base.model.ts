@@ -11,11 +11,13 @@ export interface DocumentoBaseAttributes {
     id_aerolinea: number;
     id_referencia: number;
     id_stock: number;
+    hash: string;  // Agregamos el campo hash
     createdAt: Date;
     updatedAt: Date;
 }
 
-export interface DocumentoBaseCreationAttributes extends Optional<DocumentoBaseAttributes, 'id' | 'updatedAt' | 'createdAt'> { }
+export interface DocumentoBaseCreationAttributes extends Optional<DocumentoBaseAttributes, 'id' | 'updatedAt' | 'createdAt' | 'hash'> { }
+
 
 const DocumentoBase = sequelize.define<Model<DocumentoBaseAttributes, DocumentoBaseCreationAttributes>>('documentos_base', {
     id: {
@@ -46,6 +48,9 @@ const DocumentoBase = sequelize.define<Model<DocumentoBaseAttributes, DocumentoB
             model: DocumentoBaseStock,
             key: DocumentoBaseStock.primaryKeyAttribute,
         }
+    },
+    hash: {
+        type: DataTypes.STRING,
     },
     createdAt: {
         type: DataTypes.DATE,

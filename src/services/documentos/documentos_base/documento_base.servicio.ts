@@ -5,6 +5,8 @@ import { DocumentoBaseAttributes, DocumentoBaseCreationAttributes } from "@model
 import Aerolineas from "@models/mantenimiento/aerolinea.model";
 import AgenciaIata from "@models/mantenimiento/agencia_iata";
 import DocumentoBaseStock from "@models/catalogos/documentos/documento_base_stock";
+import { createHash } from 'crypto';
+
 
 export async function getDocumentosBase(page: number = 1, pageSize: number = 10): Promise<{ data: any[], total: number }> {
     const offset = (page - 1) * pageSize; // Calcular el desplazamiento (offset)
@@ -23,26 +25,103 @@ export async function getDocumentosBase(page: number = 1, pageSize: number = 10)
 }
 
 
-export async function getDocumentoBase(id: number): Promise<DocumentoBaseAttributes | null> {
-    return await DocumentoBase.findByPk(id) as DocumentoBaseAttributes | null;
+export async function getDocumentoBase(id: number): Promise<{
+    documento: DocumentoBaseAttributes | null,
+    integridad?: VerificacionHash
+}> {
+    const documento = await DocumentoBase.findByPk(id) as DocumentoBaseAttributes | null;
+    
+    if (!documento) {
+        return { documento: null };
+    }
+
+    // Verificar integridad
+    const integridad = await verificarIntegridadDocumento(documento);
+    
+    // Si hay discrepancia, notificar al administrador
+    if (!integridad.esValido) {
+        await notificarDiscrepanciaHash({
+            documentoId: documento.id,
+            fecha: documento.fecha,
+            ...integridad
+        });
+    }
+
+    return { documento, integridad };
 }
 
+interface DiscrepanciaHash {
+    documentoId: number;
+    fecha: string;
+    hashAlmacenado: string;
+    hashCalculado: string;
+}
+
+async function notificarDiscrepanciaHash(discrepancia: DiscrepanciaHash): Promise<void> {
+    // Aquí implementarías la lógica de notificación según tu sistema
+    // Por ejemplo, podrías:
+    // 1. Guardar en una tabla de logs
+    // 2. Enviar un email
+
+
+    
+    console.error('¡ALERTA! Discrepancia detectada en hash de documento:', {
+        mensaje: 'Se ha detectado una modificación no autorizada en el documento',
+        documentoId: discrepancia.documentoId,
+        fecha: discrepancia.fecha,
+        hashAlmacenado: discrepancia.hashAlmacenado,
+        hashCalculado: discrepancia.hashCalculado,
+        fechaDeteccion: new Date().toISOString()
+    });
+
+    // Aquí puedes implementar tu lógica de notificación preferida
+    // Por ejemplo, si tienes un servicio de notificaciones:
+    /*
+    await NotificacionService.crear({
+        tipo: 'ALERTA_SEGURIDAD',
+        severidad: 'ALTA',
+        mensaje: `Discrepancia en hash detectada - Documento ID: ${discrepancia.documentoId}`,
+        detalles: JSON.stringify(discrepancia),
+        fechaDeteccion: new Date()
+    });
+    */
+}
+
+
+
+
+/********************************************** */
+
 export async function createDocumentoBase(documento_base: DocumentoBaseCreationAttributes) {
-    return await DocumentoBase.create({ ...documento_base, createdAt: new Date(), updatedAt: new Date() });
+    const hash = generarDocumentoHash(documento_base);
+    return await DocumentoBase.create({ 
+        ...documento_base, 
+        hash,
+        createdAt: new Date(), 
+        updatedAt: new Date() 
+    });
 }
 
 export async function updateDocumentoBase(documento_base: DocumentoBaseAttributes) {
-    console.log(documento_base);
     const documento_baseToUpdate = await DocumentoBase.findByPk(documento_base.id);
     if (documento_baseToUpdate) {
         const { createdAt, ...updateData } = documento_base;
-        await DocumentoBase.update({ ...updateData, updatedAt: new Date() }, {
-            where: {
-                id: documento_base.id
+        const hash = generarDocumentoHash(updateData);
+        
+        await DocumentoBase.update(
+            { 
+                ...updateData, 
+                hash,
+                updatedAt: new Date() 
+            }, 
+            {
+                where: {
+                    id: documento_base.id
+                }
             }
-        });
-        const updatedDocumentoBase = await DocumentoBase.findByPk(documento_base.id);
-        return updatedDocumentoBase;
+        );
+        
+        return await DocumentoBase.findByPk(documento_base.id);
     }
     return null;
 }
@@ -56,6 +135,39 @@ export async function deleteDocumentosBase(ids: any[]) {
 }
 
 
+/**********PARA EL HASH************/
+function generarDocumentoHash(documento: DocumentoBaseAttributes | DocumentoBaseCreationAttributes): string {
+    const relevantData = {
+        fecha: documento.fecha,
+        id_aerolinea: documento.id_aerolinea,
+        id_referencia: documento.id_referencia,
+        id_stock: documento.id_stock,
+        timestamp: new Date().getTime()
+    };
+    
+    return createHash('sha256')
+        .update(JSON.stringify(relevantData))
+        .digest('hex');
+}
+
+interface VerificacionHash {
+    esValido: boolean;
+    hashAlmacenado: string;
+    hashCalculado: string;
+}
+
+async function verificarIntegridadDocumento(documento: DocumentoBaseAttributes): Promise<VerificacionHash> {
+    // Recalcular el hash
+    const hashCalculado = generarDocumentoHash(documento);
+    
+    return {
+        esValido: documento.hash === hashCalculado,
+        hashAlmacenado: documento.hash,
+        hashCalculado: hashCalculado
+    };
+}
+
+
 
 export async function crearDocumentoYGuias(
     documento_base: DocumentoBaseCreationAttributes,
@@ -63,19 +175,22 @@ export async function crearDocumentoYGuias(
     secuencial_inicial: number,
     prefijo: number
 ): Promise<DocumentoBaseAttributes> {
-    // Iniciar una transacción
     const t = await sequelize.transaction();
     try {
-        // Crear el documento base
+        const hash = generarDocumentoHash(documento_base);
+        
         const documento_base_creado: DocumentoBaseAttributes = (await DocumentoBase.create(
-            { ...documento_base, createdAt: new Date(), updatedAt: new Date() },
+            { 
+                ...documento_base, 
+                hash,
+                createdAt: new Date(), 
+                updatedAt: new Date() 
+            },
             { transaction: t }
         )).get({ plain: true });
 
-        // Generar los secuenciales siguiendo la lógica especificada
         const secuenciales = generarSecuenciales(secuencial_inicial, n_guias);
 
-        // Crear las guías madre
         const guiasPromises = secuenciales.map(sec => GuiaMadre.create({
             id_documento_base: documento_base_creado.id,
             prefijo: prefijo,
@@ -84,11 +199,9 @@ export async function crearDocumentoYGuias(
 
         await Promise.all(guiasPromises);
 
-        // Confirmar la transacción
         await t.commit();
         return documento_base_creado;
     } catch (error) {
-        // Revertir la transacción en caso de error
         await t.rollback();
         throw error;
     }
