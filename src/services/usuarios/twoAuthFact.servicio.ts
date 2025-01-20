@@ -4,6 +4,26 @@ import jwt from 'jsonwebtoken';
 import { SECRET_KEY } from "@db/config";
 import { Usuario } from "@typesApp/usuarios/usuario.type";
 
+
+interface AuditLog {
+    userId: string;
+    timestamp: Date;
+    ipAddress: string;
+    attemptStatus: 'failed' | 'blocked';
+    remainingAttempts: number;
+}
+
+function logFailedAttempt(auditData: AuditLog) {
+    console.log('=== Failed 2FA Attempt Audit Log ===');
+    console.log(`User ID: ${auditData.userId}`);
+    console.log(`Timestamp: ${auditData.timestamp.toISOString()}`);
+    console.log(`IP Address: ${auditData.ipAddress}`);
+    console.log(`Status: ${auditData.attemptStatus}`);
+    console.log(`Remaining Attempts: ${auditData.remainingAttempts}`);
+    console.log('==================================');
+}
+
+
 export class TwoFactorAuthService {
     private redis: Redis;
     private readonly CODE_LENGTH = 6;
@@ -71,13 +91,33 @@ export class TwoFactorAuthService {
         };
     }
 
-    async verifyTwoFactorCode(userId: string, inputCode: string): Promise<boolean> {
+    async verifyTwoFactorCode(userId: string, inputCode: string, ipAddress: string): Promise<{
+        isValid: boolean;
+        shouldRetry: boolean;
+        remainingAttempts: number;
+        message: string;
+
+    }> {
         const keys = this.getRedisKeys(userId);
 
         const isBlocked = await this.redis.exists(keys.blocked);
         if (isBlocked) {
             const ttl = await this.redis.ttl(keys.blocked);
-            throw new Error(`Usuario bloqueado. Intente nuevamente en ${Math.ceil(ttl / 60)} minutos`);
+            
+            logFailedAttempt({
+                userId,
+                timestamp: new Date(),
+                ipAddress,
+                attemptStatus: 'blocked',
+                remainingAttempts: 0
+            });
+
+            return {
+                isValid: false,
+                shouldRetry: false,
+                remainingAttempts: 0,
+                message: `Usuario bloqueado. Intente nuevamente en ${Math.ceil(ttl / 60)} minutos`
+            };
         }
 
         const [storedCode, remainingAttemptsStr] = await Promise.all([
@@ -86,23 +126,48 @@ export class TwoFactorAuthService {
         ]);
 
         if (!storedCode || !remainingAttemptsStr) {
-            throw new Error('Código expirado o inválido');
+            return {
+                isValid: false,
+                shouldRetry: false,
+                remainingAttempts: 0,
+                message: 'Código expirado o inválido'
+            };
         }
 
         const remainingAttempts = parseInt(remainingAttemptsStr) - 1;
 
         if (inputCode !== storedCode) {
+            logFailedAttempt({
+                userId,
+                timestamp: new Date(),
+                ipAddress,
+                attemptStatus: 'failed',
+                remainingAttempts
+            });
             if (remainingAttempts <= 0) {
                 await this.redis.set(keys.blocked, '1', 'EX', this.BLOCK_TIME);
                 await Promise.all([
                     this.redis.del(keys.code),
                     this.redis.del(keys.attempts)
                 ]);
-                throw new Error(`Máximo de intentos excedido. Usuario bloqueado por ${this.BLOCK_TIME / 60} minutos`);
+                
+                console.log(`Usuario ${userId} bloqueado por exceder el máximo de intentos`);
+                
+                return {
+                    isValid: false,
+                    shouldRetry: false,
+                    remainingAttempts: 0,
+                    message: `Máximo de intentos excedido. Usuario bloqueado por ${this.BLOCK_TIME / 60} minutos`
+                };
             }
 
             await this.redis.set(keys.attempts, remainingAttempts, 'EX', this.CODE_TTL);
-            throw new Error(`Código incorrecto. Intentos restantes: ${remainingAttempts}`);
+            return {
+                isValid: false,
+                shouldRetry: true,
+                remainingAttempts,
+                message: `Código incorrecto. Intentos restantes: ${remainingAttempts}`
+            };
         }
 
         await Promise.all([
@@ -110,7 +175,12 @@ export class TwoFactorAuthService {
             this.redis.del(keys.attempts)
         ]);
 
-        return true;
+        return {
+            isValid: true,
+            shouldRetry: false,
+            remainingAttempts: 0,
+            message: 'Código verificado exitosamente'
+        };
     }
 
     async cleanup(userId: string): Promise<void> {
