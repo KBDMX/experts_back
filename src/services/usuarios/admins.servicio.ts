@@ -4,6 +4,7 @@ import "src/config/assosiations/usuario/user_admin.as";
 
 import { Admin, AdminAtrubutosCreacion } from "@typesApp/usuarios/admin.type";
 import { UUID } from "crypto";
+import { Usuario } from "@typesApp/usuarios/usuario.type";
 
 export async function getAdmins(): Promise<Admin[]> {
     const adminsList = await Admins.findAll();
@@ -62,4 +63,19 @@ export async function isUserAdmin(userId: UUID): Promise<boolean | null> {
 
     return user !== null;
 }
+/*
+export async function updateRolUsuario(id: number, nuevoRol: String): Promise<Usuario | null> {
+    const UToUpdate = await Admins.findByPk(id);
+    if (adminToUpdate) {
+        await Admins.update(admin, {
+            where: {
+                id_usuario: id
+            }
+        });
+        const updatedAdmin = await Admins.findByPk(id);
+        return updatedAdmin ? updatedAdmin.toJSON() as Admin : null;
+    }
+    return null;
+}
+*/
 
