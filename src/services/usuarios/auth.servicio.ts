@@ -6,6 +6,7 @@ import Admins from '@models/usuarios/admins.model';
 import Usuarios from "@models/usuarios/usuario.model";
 import { Usuario, UsuarioAtributosCreacion } from "@typesApp/usuarios/usuario.type";
 import { SECRET_KEY, BY_SALT, SECRET_REFRESH_KEY } from "@db/config";
+import { sendAuthCode } from '@services/usuarios/correo.servicio';
 
 import { UUID } from 'crypto';
 
@@ -68,10 +69,13 @@ export async function login(
      // Generar código 2FA y token temporal
      const twoFactorResponse = await twoFactorService.generateTwoFactorCode(user.id_usuario.toString());
 
-     // TODO:  Enviar código 2FA al usuario
-     // Por el momento, se imprime en consola para probar funcionamiento
-        console.log(`Código 2FA: ${twoFactorResponse.code}`);
-    
+     // Enviar código 2FA al usuario
+     if (user.email) {
+         sendAuthCode(user.email, twoFactorResponse.code);
+     } else {
+         throw new Error('El usuario no tiene un correo electrónico válido');
+     }
+
 
      //Devolver token
      const tempToken = jwt.sign(
@@ -82,10 +86,6 @@ export async function login(
         SECRET_KEY!,
         { expiresIn: '10m' }
     );
-
-
-    // ========================!============================
-    // TODO: Invocar a la función para comprobar el segundo factor de autenticación
 
 
     const isValid = await verifyTestTwoFactor(user.id_usuario.toString());
@@ -251,7 +251,7 @@ async function readTwoFactorCode(): Promise<string> {
     });
 
     return new Promise((resolve) => {
-        rl.question('Por favor, ingrese el código 2FA mostrado: ', (code) => {
+        rl.question('Por favor, ingrese el código 2FA enviado al correo ', (code) => {
             rl.close();
             resolve(code);
         });
