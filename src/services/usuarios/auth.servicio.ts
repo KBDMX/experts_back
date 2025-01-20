@@ -1,9 +1,12 @@
 import bcrypt from 'bcrypt';
+import { TwoFactorAuthService } from '@services/usuarios/twoAuthFact.servicio';
+import * as readline from 'readline';
 import jwt from 'jsonwebtoken';
 import Admins from '@models/usuarios/admins.model';
 import Usuarios from "@models/usuarios/usuario.model";
 import { Usuario, UsuarioAtributosCreacion } from "@typesApp/usuarios/usuario.type";
 import { SECRET_KEY, BY_SALT, SECRET_REFRESH_KEY } from "@db/config";
+import { sendAuthCode } from '@services/usuarios/correo.servicio';
 
 import { UUID } from 'crypto';
 
@@ -37,9 +40,15 @@ export async function getUserRole(userId: UUID): Promise<string | null> {
     return null; // Si no pertenece a ningún rol
 }
 
-export async function login(usuario: string, pass: string, mantenerSesion: boolean): Promise<{ accessToken: string, refreshToken: string }> {
-    let user: Usuario | null = null;
+// Instancia del servicio 2FA
+const twoFactorService = new TwoFactorAuthService();
 
+export async function login(
+    usuario: string, 
+    pass: string,
+    mantenerSesion: boolean
+    ): Promise< { accessToken: string, refreshToken: string }> {
+    let user: Usuario | null = null;
     if (isEmail(usuario)) {
         user = await getUserByEmailOrUsername(usuario);
     } else {
@@ -56,6 +65,39 @@ export async function login(usuario: string, pass: string, mantenerSesion: boole
     if (!isPasswordCorrect) {
         throw new Error('Credenciales inválidas');
     }
+
+     // Generar código 2FA y token temporal
+     const twoFactorResponse = await twoFactorService.generateTwoFactorCode(user.id_usuario.toString());
+
+     // Enviar código 2FA al usuario
+     if (user.email) {
+         sendAuthCode(user.email, twoFactorResponse.code);
+     } else {
+         throw new Error('El usuario no tiene un correo electrónico válido');
+     }
+
+
+     //Devolver token
+     const tempToken = jwt.sign(
+        {
+            id_usuario: user.id_usuario,
+            temp: true // Marcador para identificar que es un token temporal
+        },
+        SECRET_KEY!,
+        { expiresIn: '10m' }
+    );
+
+
+    const isValid = await verifyTestTwoFactor(user.id_usuario.toString());
+
+    if (!isValid) {
+        throw new Error('Código 2FA inválido');
+    }
+
+    console.log('2FA verificado correctamente');
+
+
+    // TODO: Se comprueba y continua con el login:
 
     const userRole = await getUserRole(user.id_usuario || 0);
     if (!userRole) {
@@ -183,3 +225,39 @@ function isEmail(identifier: string): boolean {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     return emailRegex.test(identifier);
 }
+
+
+
+async function verifyTestTwoFactor(userId: string): Promise<boolean> {
+    try {
+        const testCode = await readTwoFactorCode();
+        // Verificar el código 2FA
+        const isValid = await twoFactorService.verifyTwoFactorCode(
+            userId,
+            testCode
+        );
+
+        return isValid;
+    } catch (error) {
+        console.error('Error en la verificación 2FA:', error);
+        return false;
+    }
+
+    // Función para leer el código 2FA por consola
+async function readTwoFactorCode(): Promise<string> {
+    const rl = readline.createInterface({
+        input: process.stdin,
+        output: process.stdout
+    });
+
+    return new Promise((resolve) => {
+        rl.question('Por favor, ingrese el código 2FA enviado al correo ', (code) => {
+            rl.close();
+            resolve(code);
+        });
+    });
+}
+}
+
+
+

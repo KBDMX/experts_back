@@ -13,8 +13,20 @@ services:
     networks:
       - app-network
 
+  redis:
+    image: redis:latest
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD}
+    environment:
+      - REDIS_PASSWORD=${REDIS_PASSWORD}
+    networks:
+      - app-network
 volumes:
   pg-data:
+  redis_data:
 
 networks:
   app-network:
