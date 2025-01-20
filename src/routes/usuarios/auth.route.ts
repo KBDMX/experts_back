@@ -26,7 +26,7 @@ router.post('/login',
     async (req: Request, res: Response, next: NextFunction) => {
         try {
             const { usuario, pass, recordar } = req.body;
-            const result = await login(usuario, pass, recordar || false);
+            const result = await login(usuario, pass, recordar || false, req);
 
             // Configurar cookies
             res.cookie('access_token', result.accessToken, {

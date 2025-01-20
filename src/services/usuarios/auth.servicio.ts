@@ -1,4 +1,5 @@
 import bcrypt from 'bcrypt';
+import { Request } from 'express';
 import { TwoFactorAuthService } from '@services/usuarios/twoAuthFact.servicio';
 import * as readline from 'readline';
 import jwt from 'jsonwebtoken';
@@ -46,7 +47,8 @@ const twoFactorService = new TwoFactorAuthService();
 export async function login(
     usuario: string, 
     pass: string,
-    mantenerSesion: boolean
+    mantenerSesion: boolean,
+    req: Request
     ): Promise< { accessToken: string, refreshToken: string }> {
     let user: Usuario | null = null;
     if (isEmail(usuario)) {
@@ -66,7 +68,7 @@ export async function login(
         throw new Error('Credenciales inválidas');
     }
 
-    if(! await handleTwoFactorAuth(user)){
+    if(! await handleTwoFactorAuth(user, req)){
         throw new Error('Credenciales inválidas');
     }
  
@@ -213,10 +215,12 @@ function isEmail(identifier: string): boolean {
         });
 }
 
-async function handleTwoFactorAuth(user: Usuario) {
+async function handleTwoFactorAuth(user: Usuario, req: Request) {
     const twoFactorService = new TwoFactorAuthService();
     
     try {
+        const ipAddress = req.ip || req.socket.remoteAddress || 'unknown';
+
         // Generar código 2FA y token temporal
         const twoFactorResponse = await twoFactorService.generateTwoFactorCode(user.id_usuario.toString());
         
@@ -236,7 +240,8 @@ async function handleTwoFactorAuth(user: Usuario) {
             
             const verificationResult = await twoFactorService.verifyTwoFactorCode(
                 user.id_usuario.toString(),
-                codeReceived
+                codeReceived,
+                ipAddress
             );
 
             console.log(verificationResult.message);

@@ -18,6 +18,7 @@ const createEmailTemplate = (code:String) => {
     subject: 'Código de verificación',
     html: `
       <div style="font-family: Arial, sans-serif; padding: 20px; text-align: center;">
+        <h1>ExpertGuide</h1>
         <h2>Tu código de verificación</h2>
         <p>Usa el siguiente código para verificar tu cuenta:</p>
         <div style="background-color: #f0f0f0; padding: 15px; margin: 20px 0; font-size: 24px; font-weight: bold;">
