@@ -23,6 +23,4 @@ const Usuario = sequelize.define<Model<Usuario, UsuarioAtributosCreacion>>('usua
     }
 });
 
-
-
 export default Usuario;

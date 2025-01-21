@@ -28,8 +28,13 @@ const sequelize = new Sequelize({
     }
 });
 
-sequelize.sync({ alter: true })
-    .then(() => console.log('Database synchronized'))
-    .catch(err => console.error('Error synchronizing database', err));
+(async () => {
+    try {
+        await sequelize.sync({ alter: true });
+        console.log('Database synchronized');
+    } catch (err) {
+        console.error('Error synchronizing database', err);
+    }
+})();
 
 export default sequelize;
