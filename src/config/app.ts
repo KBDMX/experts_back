@@ -44,6 +44,7 @@ import usuarios from '@routes/usuarios/usuario.route';
 import { logger } from '@utils/logger';
 import morgan from 'morgan';
 
+import sequelize, { syncDatabase } from './experts.db';
 const app = express();
 
 app.use(
@@ -127,5 +128,8 @@ app.use('/api/v1',
 
 // Middleware para manejo de errores
 app.use(errorHandler);
+
+
+syncDatabase();
 
 export default app;
