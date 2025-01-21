@@ -45,11 +45,11 @@ export async function getUserRole(userId: UUID): Promise<string | null> {
 const twoFactorService = new TwoFactorAuthService();
 
 export async function login(
-    usuario: string, 
+    usuario: string,
     pass: string,
     mantenerSesion: boolean,
     req: Request
-    ): Promise< { accessToken: string, refreshToken: string }> {
+): Promise<{ accessToken: string, refreshToken: string, userId: UUID }> {
     let user: Usuario | null = null;
     if (isEmail(usuario)) {
         user = await getUserByEmailOrUsername(usuario);
@@ -68,11 +68,11 @@ export async function login(
         throw new Error('Credenciales inválidas');
     }
 
-    if(! await handleTwoFactorAuth(user, req)){
+    if (! await handleTwoFactorAuth(user, req)) {
         throw new Error('Credenciales inválidas');
     }
- 
-  
+
+
     const userRole = await getUserRole(user.id_usuario || 0);
     if (!userRole) {
         throw new Error('El usuario no tiene un rol asignado');
@@ -106,9 +106,10 @@ export async function login(
         { expiresIn: refreshTokenExpiresIn }
     );
 
+    const userId = user.id_usuario;
     // Opcional: Guardar el refreshToken en la base de datos si deseas invalidarlo posteriormente
 
-    return { accessToken, refreshToken };
+    return { accessToken, refreshToken, userId };
 }
 
 export async function register(usuario: UsuarioAtributosCreacion): Promise<UsuarioAtributosCreacion> {
@@ -200,30 +201,30 @@ function isEmail(identifier: string): boolean {
     return emailRegex.test(identifier);
 }
 
-    // Función para leer el código 2FA por consola
-    async function readTwoFactorCode(): Promise<string> {
-        const rl = readline.createInterface({
-            input: process.stdin,
-            output: process.stdout
-        });
+// Función para leer el código 2FA por consola
+async function readTwoFactorCode(): Promise<string> {
+    const rl = readline.createInterface({
+        input: process.stdin,
+        output: process.stdout
+    });
 
-        return new Promise((resolve) => {
-            rl.question('Por favor, ingrese el código 2FA enviado al correo ', (code) => {
-                rl.close();
-                resolve(code);
-            });
+    return new Promise((resolve) => {
+        rl.question('Por favor, ingrese el código 2FA enviado al correo ', (code) => {
+            rl.close();
+            resolve(code);
         });
+    });
 }
 
 async function handleTwoFactorAuth(user: Usuario, req: Request) {
     const twoFactorService = new TwoFactorAuthService();
-    
+
     try {
         const ipAddress = req.ip || req.socket.remoteAddress || 'unknown';
 
         // Generar código 2FA y token temporal
         const twoFactorResponse = await twoFactorService.generateTwoFactorCode(user.id_usuario.toString());
-        
+
         // Enviar código 2FA al usuario
         if (user.email) {
             sendAuthCode(user.email, twoFactorResponse.code);
@@ -237,7 +238,7 @@ async function handleTwoFactorAuth(user: Usuario, req: Request) {
         while (shouldRetry) {
             // Solicitar código en consola
             const codeReceived = await readTwoFactorCode();
-            
+
             const verificationResult = await twoFactorService.verifyTwoFactorCode(
                 user.id_usuario.toString(),
                 codeReceived,
