@@ -124,8 +124,32 @@ export async function register(usuario: UsuarioAtributosCreacion): Promise<Usuar
         throw new Error('Faltan datos');
     }
 
+    // Validaciones de contraseña
     if (pass.length < 6) {
         throw new Error('La contraseña debe tener al menos 6 caracteres');
+    }
+
+    const passwordRegex = {
+        mayuscula: /[A-Z]/,
+        minuscula: /[a-z]/,
+        numero: /[0-9]/,
+        especial: /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/
+    };
+
+    if (!passwordRegex.mayuscula.test(pass)) {
+        throw new Error('La contraseña debe contener al menos una letra mayúscula');
+    }
+
+    if (!passwordRegex.minuscula.test(pass)) {
+        throw new Error('La contraseña debe contener al menos una letra minúscula');
+    }
+
+    if (!passwordRegex.numero.test(pass)) {
+        throw new Error('La contraseña debe contener al menos un número');
+    }
+
+    if (!passwordRegex.especial.test(pass)) {
+        throw new Error('La contraseña debe contener al menos un carácter especial');
     }
 
     if (username.length < 6 || username.length > 20) {
