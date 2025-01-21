@@ -1,16 +1,16 @@
+// auth.service.ts
+
 import bcrypt from 'bcrypt';
-import { Request } from 'express';
-import { TwoFactorAuthService } from '@services/usuarios/twoAuthFact.servicio';
-import * as readline from 'readline';
 import jwt from 'jsonwebtoken';
+import { TwoFactorAuthService } from '@services/usuarios/twoAuthFact.servicio';
 import Admins from '@models/usuarios/admins.model';
 import Usuarios from "@models/usuarios/usuario.model";
 import { Usuario, UsuarioAtributosCreacion } from "@typesApp/usuarios/usuario.type";
 import { SECRET_KEY, BY_SALT, SECRET_REFRESH_KEY } from "@db/config";
 import { sendAuthCode } from '@services/usuarios/correo.servicio';
-
 import { UUID } from 'crypto';
 
+// Mapa de roles y sus tablas correspondientes
 const roleTableMap: { [key: string]: any } = {
     admin: Admins,
     // Agrega otros roles y sus tablas aquí
@@ -18,6 +18,19 @@ const roleTableMap: { [key: string]: any } = {
     // "manager": Managers,
 };
 
+// Instancia del servicio 2FA
+const twoFactorService = new TwoFactorAuthService();
+
+// Clave secreta específica para tokens temporales 2FA
+const TEMP_TOKEN_SECRET = process.env.TEMP_TOKEN_SECRET || 'your-temp-token-secret';
+
+// Interfaces
+interface TempTokenPayload {
+    id_usuario: UUID;
+    expiresAt: Date;
+}
+
+// Funciones de verificación de roles
 export async function isUserInRole(userId: UUID, role: string): Promise<boolean> {
     const roleTable = roleTableMap[role];
     if (!roleTable) {
@@ -35,30 +48,132 @@ export async function getUserRole(userId: UUID): Promise<string | null> {
     for (const role of Object.keys(roleTableMap)) {
         const isInRole = await isUserInRole(userId, role);
         if (isInRole) {
-            return role; // Devuelve el primer rol encontrado
+            return role;
         }
     }
-    return null; // Si no pertenece a ningún rol
+    return null;
 }
 
-// Instancia del servicio 2FA
-const twoFactorService = new TwoFactorAuthService();
-
-export async function login(
-    usuario: string, 
+// Inicio del proceso de autenticación y generación de código 2FA
+export async function initiate2FA(
+    usuario: string,
     pass: string,
-    mantenerSesion: boolean,
-    req: Request
-    ): Promise< { accessToken: string, refreshToken: string }> {
-    let user: Usuario | null = null;
-    if (isEmail(usuario)) {
-        user = await getUserByEmailOrUsername(usuario);
+    ipAddress: string
+): Promise<{
+    tempToken: string;
+    expiresAt: Date;
+}> {
+    // Validar credenciales
+    const user = await validateCredentials(usuario, pass);
+    
+    // Generar código 2FA
+    const twoFactorResponse = await twoFactorService.generateTwoFactorCode(user.id_usuario.toString());
+    
+    // Enviar código por correo
+    if (user.email) {
+        await sendAuthCode(user.email, twoFactorResponse.code);
     } else {
-        const userInstance = await Usuarios.findOne({ where: { usuario } });
-        //console.log(userInstance);
-        user = userInstance ? userInstance.dataValues as Usuario : null;
+        throw new Error('El usuario no tiene un correo electrónico válido');
     }
 
+    // Generar token temporal para la verificación 2FA
+    const tempToken = jwt.sign(
+        {
+            id_usuario: user.id_usuario,
+            expiresAt: twoFactorResponse.expiresAt
+        } as TempTokenPayload,
+        TEMP_TOKEN_SECRET,
+        { expiresIn: '10m' } // El token temporal expira en 10 minutos
+    );
+
+    return {
+        tempToken,
+        expiresAt: twoFactorResponse.expiresAt
+    };
+}
+
+// Verificación del código 2FA
+export async function verify2FA(
+    code: string,
+    tempToken: string,
+    mantenerSesion: boolean,
+    ipAddress: string
+): Promise<{
+    isValid: boolean;
+    shouldRetry: boolean;
+    remainingAttempts: number;
+    message: string;
+    tokens?: {
+        accessToken: string;
+        refreshToken: string;
+    };
+}> {
+    console.log('Iniciando verificación 2FA:', {
+        tempToken: `${tempToken.substring(0, 10)}...`,
+        mantenerSesion,
+        ipAddress
+    });
+
+    try {
+        // Validar token temporal
+        console.log('Decodificando token temporal...');
+        const decoded = jwt.verify(tempToken, TEMP_TOKEN_SECRET) as TempTokenPayload;
+        const userId = decoded.id_usuario;
+        console.log('Token temporal decodificado exitosamente. Usuario ID:', userId);
+
+        // Verificar código 2FA
+        console.log('Verificando código 2FA para usuario:', userId);
+        const verificationResult = await twoFactorService.verifyTwoFactorCode(
+            userId.toString(),
+            code,
+            ipAddress
+        );
+        console.log('Resultado de verificación 2FA:', {
+            isValid: verificationResult.isValid,
+            shouldRetry: verificationResult.shouldRetry,
+            remainingAttempts: verificationResult.remainingAttempts
+        });
+
+        if (verificationResult.isValid) {
+            // Obtener rol del usuario y generar tokens finales
+            console.log('Código 2FA válido. Obteniendo rol del usuario...');
+            const userRole = await getUserRole(userId);
+            
+            if (!userRole) {
+                console.error('Error: Usuario sin rol asignado. ID:', userId);
+                throw new Error('El usuario no tiene un rol asignado');
+            }
+            
+            console.log('Generando tokens de autenticación para usuario:', {
+                userId,
+                role: userRole,
+                mantenerSesion
+            });
+            
+            const tokens = await generateAuthTokens(userId, userRole, mantenerSesion);
+            console.log('Tokens generados exitosamente');
+            
+            return {
+                ...verificationResult,
+                tokens
+            };
+        }
+
+        console.log('Código 2FA inválido. Retornando resultado de verificación');
+        return verificationResult;
+    } catch (error) {
+        if (error instanceof jwt.TokenExpiredError) {
+            console.error('Error: Token temporal expirado');
+            throw new Error('El token temporal ha expirado');
+        }
+        console.error('Error inesperado durante la verificación 2FA:', error);
+        throw error;
+    }
+}
+
+// Funciones auxiliares
+async function validateCredentials(usuario: string, pass: string): Promise<Usuario> {
+    const user = await getUserByEmailOrUsername(usuario);
     if (!user) {
         throw new Error('Credenciales inválidas');
     }
@@ -68,30 +183,27 @@ export async function login(
         throw new Error('Credenciales inválidas');
     }
 
-    if(! await handleTwoFactorAuth(user, req)){
-        throw new Error('Credenciales inválidas');
-    }
- 
-  
-    const userRole = await getUserRole(user.id_usuario || 0);
-    if (!userRole) {
-        throw new Error('El usuario no tiene un rol asignado');
+    return user;
+}
+
+async function generateAuthTokens(
+    userId: UUID,
+    userRole: string,
+    mantenerSesion: boolean
+): Promise<{
+    accessToken: string;
+    refreshToken: string;
+}> {
+    if (!SECRET_KEY || !SECRET_REFRESH_KEY) {
+        throw new Error('Claves secretas no configuradas');
     }
 
-    if (!SECRET_KEY) {
-        throw new Error('Clave secreta no configurada');
-    }
-
-    if (!SECRET_REFRESH_KEY) {
-        throw new Error('Clave secreta de refresco no configurada');
-    }
-
-    const accessTokenExpiresIn = '15m'; // Token de acceso válido por 15 minutos
-    const refreshTokenExpiresIn = mantenerSesion ? '7d' : '1h'; // Token de refresco
+    const accessTokenExpiresIn = '15m';
+    const refreshTokenExpiresIn = mantenerSesion ? '7d' : '1h';
 
     const accessToken = jwt.sign(
         {
-            id_usuario: user.id_usuario,
+            id_usuario: userId,
             rol: userRole
         },
         SECRET_KEY,
@@ -100,17 +212,16 @@ export async function login(
 
     const refreshToken = jwt.sign(
         {
-            id_usuario: user.id_usuario
+            id_usuario: userId
         },
-        SECRET_REFRESH_KEY, // Nueva clave secreta para el token de refresco
+        SECRET_REFRESH_KEY,
         { expiresIn: refreshTokenExpiresIn }
     );
-
-    // Opcional: Guardar el refreshToken en la base de datos si deseas invalidarlo posteriormente
 
     return { accessToken, refreshToken };
 }
 
+// Registro de nuevos usuarios
 export async function register(usuario: UsuarioAtributosCreacion): Promise<UsuarioAtributosCreacion> {
     const userExists = await getUserByEmailOrUsername(usuario.email || '');
     if (userExists) {
@@ -120,7 +231,7 @@ export async function register(usuario: UsuarioAtributosCreacion): Promise<Usuar
     const { email, usuario: username, pass } = usuario;
 
     if (!email || !username || !pass) {
-        throw new Error('Faltan datos');
+        throw new Error('Faltan datos requeridos');
     }
 
     if (pass.length < 6) {
@@ -154,6 +265,7 @@ export async function register(usuario: UsuarioAtributosCreacion): Promise<Usuar
     }
 }
 
+// Verificación de tokens
 export async function verifyToken(token: string): Promise<{ valid: boolean }> {
     if (!SECRET_KEY) {
         throw new Error('Clave secreta no configurada');
@@ -166,27 +278,33 @@ export async function verifyToken(token: string): Promise<{ valid: boolean }> {
         throw new Error('Token inválido');
     }
 }
-export async function refreshToken(token: string): Promise<{ token: string }> {
-    const payload = jwt.verify(token, SECRET_REFRESH_KEY!) as { id_usuario: UUID };
 
-    const userRole = await getUserRole(payload.id_usuario || 0);
+// Refrescar token
+export async function refreshToken(token: string): Promise<{ token: string }> {
+    if (!SECRET_REFRESH_KEY || !SECRET_KEY) {
+        throw new Error('Claves secretas no configuradas');
+    }
+
+    const payload = jwt.verify(token, SECRET_REFRESH_KEY) as { id_usuario: UUID };
+
+    const userRole = await getUserRole(payload.id_usuario);
     if (!userRole) {
         throw new Error('El usuario no tiene un rol asignado');
     }
-
 
     const newAccessToken = jwt.sign(
         {
             id_usuario: payload.id_usuario,
             rol: userRole
         },
-        SECRET_KEY!,
+        SECRET_KEY,
         { expiresIn: '15m' }
     );
 
     return { token: newAccessToken };
 }
 
+// Funciones de utilidad
 async function getUserByEmailOrUsername(identifier: string): Promise<Usuario | null> {
     if (isEmail(identifier)) {
         return await Usuarios.findOne({ where: { email: identifier } }) as Usuario | null;
@@ -200,66 +318,12 @@ function isEmail(identifier: string): boolean {
     return emailRegex.test(identifier);
 }
 
-    // Función para leer el código 2FA por consola
-    async function readTwoFactorCode(): Promise<string> {
-        const rl = readline.createInterface({
-            input: process.stdin,
-            output: process.stdout
-        });
-
-        return new Promise((resolve) => {
-            rl.question('Por favor, ingrese el código 2FA enviado al correo ', (code) => {
-                rl.close();
-                resolve(code);
-            });
-        });
-}
-
-async function handleTwoFactorAuth(user: Usuario, req: Request) {
-    const twoFactorService = new TwoFactorAuthService();
-    
-    try {
-        const ipAddress = req.ip || req.socket.remoteAddress || 'unknown';
-
-        // Generar código 2FA y token temporal
-        const twoFactorResponse = await twoFactorService.generateTwoFactorCode(user.id_usuario.toString());
-        
-        // Enviar código 2FA al usuario
-        if (user.email) {
-            sendAuthCode(user.email, twoFactorResponse.code);
-        } else {
-            throw new Error('El usuario no tiene un correo electrónico válido');
-        }
-
-        let isAuthenticated = false;
-        let shouldRetry = true;
-
-        while (shouldRetry) {
-            // Solicitar código en consola
-            const codeReceived = await readTwoFactorCode();
-            
-            const verificationResult = await twoFactorService.verifyTwoFactorCode(
-                user.id_usuario.toString(),
-                codeReceived,
-                ipAddress
-            );
-
-            console.log(verificationResult.message);
-
-            if (verificationResult.isValid) {
-                isAuthenticated = true;
-                break;
-            }
-
-            shouldRetry = verificationResult.shouldRetry;
-        }
-
-        return isAuthenticated;
-    } catch (error) {
-        console.error('Error en la autenticación de dos factores:', error);
-        throw error;
-    }
-}
-
-
-
+export default {
+    initiate2FA,
+    verify2FA,
+    register,
+    verifyToken,
+    refreshToken,
+    isUserInRole,
+    getUserRole
+};
