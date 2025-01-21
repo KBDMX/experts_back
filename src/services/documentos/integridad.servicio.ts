@@ -25,6 +25,17 @@ export async function notificarDiscrepanciaHash(discrepancia: DiscrepanciaHash):
         fechaDeteccion: new Date().toISOString()
     });
 
+    // Aquí puedes implementar tu lógica de notificación preferida
+    // Por ejemplo, si tienes un servicio de notificaciones:
+    /*
+    await NotificacionService.crear({
+        tipo: 'ALERTA_SEGURIDAD',
+        severidad: 'ALTA',
+        mensaje: `Discrepancia en hash detectada - Documento ID: ${discrepancia.documentoId}`,
+        detalles: JSON.stringify(discrepancia),
+        fechaDeteccion: new Date()
+    });
+    */
     
 }
 

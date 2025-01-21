@@ -91,7 +91,7 @@ app.use(expressjwt({
         return token || null;
     },
     credentialsRequired: true,
-}).unless({ path: ['/api/v1/login', '/api/v1/register', '/api-docs'] }));
+}).unless({ path: ['/api/v1/login', '/api/v1/register', '/api-docs', '/api/v1/verify-2fa'] }));
 
 // Middleware personalizado adicional (si es necesario)
 app.use(jwtMiddleware);
