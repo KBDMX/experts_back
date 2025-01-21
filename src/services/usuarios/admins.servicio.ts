@@ -1,11 +1,11 @@
 import Admins from "@models/usuarios/admins.model";
 import Usuarios from "@models/usuarios/usuario.model";
+import Finca from "@models/usuarios/fincas.model";
 import "src/config/assosiations/usuario/user_admin.as";
 
-import { Admin, AdminAtrubutosCreacion } from "@typesApp/usuarios/admin.type";
+import { Admin, AdminAtributosCreacion } from "@typesApp/usuarios/adminRol.type";
 import { UUID } from "crypto";
 import { Usuario } from "@typesApp/usuarios/usuario.type";
-import Finca from "@models/mantenimiento/finca.model";
 import { Model, ModelStatic } from "sequelize";
 
 export async function getAdmins(): Promise<Admin[]> {
@@ -18,11 +18,11 @@ export async function getAdmin(id: number): Promise<Admin | null> {
     return admin ? admin.toJSON() as Admin : null;
 }
 
-export async function createAdmin(admin: AdminAtrubutosCreacion) {
+export async function createAdmin(admin: AdminAtributosCreacion) {
     return await Admins.create(admin as any);
 }
 
-export async function updateAdmin(id: number, admin: AdminAtrubutosCreacion): Promise<Admin | null> {
+export async function updateAdmin(id: number, admin: AdminAtributosCreacion): Promise<Admin | null> {
     const adminToUpdate = await Admins.findByPk(id);
     if (adminToUpdate) {
         await Admins.update(admin, {
@@ -74,7 +74,7 @@ const roles: { [key: string]: RolModel } = {
     "finca": Finca
 };
 
-export async function updateRolUsuario(id: number, nuevoRol: string): Promise<Usuario | null> {
+export async function updateRolUsuario(id: UUID, nuevoRol: string): Promise<Usuario | null> {
     try {
         // 1. Verificar si el usuario existe en la base de datos
         const usuario = await Usuarios.findByPk(id);

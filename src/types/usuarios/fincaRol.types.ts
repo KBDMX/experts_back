@@ -4,4 +4,4 @@ export type Finca = {
     id_usuario: UUID;
 }
 
-export type FincaAtrubutosCreacion = Omit<Finca, 'id_usuario'>;
+export type FincaAtributosCreacion = Omit<Finca, 'id_usuario'>;

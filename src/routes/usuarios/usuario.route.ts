@@ -41,9 +41,11 @@ router.put('/',
     async (req: Request, res: Response, next: NextFunction) => {
         try {
             await updateRolUsuario(req.body.id_usuario, req.body.rol);
-            res.status(200).json({ ok: true, msg: 'Actualizando rolde usuario' });
+            res.status(200).json({ ok: true, msg: 'Actualizando rol de usuario' });
         } catch (error) {
             next(error);
         }
     }
 );
+
+export default router;

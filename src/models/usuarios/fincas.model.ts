@@ -1,11 +1,10 @@
 import { Model, DataTypes } from 'sequelize';
-import { Finca, FincaAtrubutosCreacion } from '@typesApp/usuarios/fincas.types';
+import { Finca, FincaAtributosCreacion } from '@typesApp/usuarios/fincaRol.types';
 import sequelize from '@db/experts.db';
 
 import Usuario from './usuario.model';
 
-
-const Finca = sequelize.define<Model<Finca, FincaAtrubutosCreacion>>('fincas', {
+const Finca = sequelize.define<Model<Finca, FincaAtributosCreacion>>('fincas_rol', {
     id_usuario: {
         type: DataTypes.UUID,
         primaryKey: true,
@@ -16,7 +15,5 @@ const Finca = sequelize.define<Model<Finca, FincaAtrubutosCreacion>>('fincas', {
     },
 
 });
-
-
 
 export default Finca;
