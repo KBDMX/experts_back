@@ -5,28 +5,37 @@ import Transport from 'winston-transport';
 import { DB_DIALECT, DB_HOST, DB_NAME, DB_PASSWORD, DB_PORT, DB_USER } from "@db/config";
 
 // 🔗 Función para crear la base de datos si no existe
-async function createDatabaseIfNotExists() {
+export const createDatabaseIfNotExists = async (): Promise<void> => {
     const tempSequelize = new Sequelize({
         host: DB_HOST,
         port: Number(DB_PORT),
         username: DB_USER,
         password: DB_PASSWORD,
+        database: "postgres", // Especifica una base de datos existente como `postgres`
         dialect: DB_DIALECT as any,
         logging: false
     });
 
     try {
-        await tempSequelize.query(`CREATE DATABASE IF NOT EXISTS logsDB`);
-        console.log('✅ Base de datos verificada/creada exitosamente');
+        // Verifica si la base de datos ya existe
+        const [results]: any = await tempSequelize.query(
+            `SELECT 1 FROM pg_database WHERE datname = 'logsDB'`
+        );
+
+        if (results.length === 0) {
+            await tempSequelize.query(`CREATE DATABASE logsDB`);
+            console.log(`✅ Base de datos 'logsDB' creada exitosamente`);
+        } else {
+            console.log(`✅ Base de datos 'logsDB' ya existe`);
+        }
     } catch (error) {
-        console.error('❌ Error al crear la base de datos:', error);
+        console.error('❌ Error al crear/verificar la base de datos:', error);
     } finally {
         await tempSequelize.close();
     }
-}
+};
 
-// Ejecutar la creación de la base de datos
-createDatabaseIfNotExists().catch(console.error);
+
 
 // 🔗 Conectar a la base de datos
 const sequelize = new Sequelize({
