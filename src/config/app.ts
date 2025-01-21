@@ -41,9 +41,10 @@ import funcionariosAgrocalidad from '@routes/mantenimiento/funcionarios_agrocali
 import bodegueros from '@routes/mantenimiento/bodeguero.route';
 import documento_base from '@routes/documentos/documentos_base/documento_base.route';
 import usuarios from '@routes/usuarios/usuario.route';
-import { logger } from '@utils/logger';
+import { createDatabaseIfNotExists, logger } from '@utils/logger';
 import morgan from 'morgan';
 
+import sequelize, { syncDatabase } from './experts.db';
 const app = express();
 
 app.use(
@@ -127,5 +128,11 @@ app.use('/api/v1',
 
 // Middleware para manejo de errores
 app.use(errorHandler);
+
+
+syncDatabase();
+// Ejecutar la creación de la base de datos
+createDatabaseIfNotExists().catch(console.error);
+
 
 export default app;
