@@ -3,30 +3,55 @@ import { Sequelize, DataTypes, Model } from 'sequelize';
 import crypto from 'crypto';
 import Transport from 'winston-transport';
 import { DB_DIALECT, DB_HOST, DB_NAME, DB_PASSWORD, DB_PORT, DB_USER } from "@db/config";
-// 🔗 Conectar a la base de datos (configura con tus credenciales)
+
+// 🔗 Función para crear la base de datos si no existe
+async function createDatabaseIfNotExists() {
+    const tempSequelize = new Sequelize({
+        host: DB_HOST,
+        port: Number(DB_PORT),
+        username: DB_USER,
+        password: DB_PASSWORD,
+        dialect: DB_DIALECT as any,
+        logging: false
+    });
+
+    try {
+        await tempSequelize.query(`CREATE DATABASE IF NOT EXISTS logsDB`);
+        console.log('✅ Base de datos verificada/creada exitosamente');
+    } catch (error) {
+        console.error('❌ Error al crear la base de datos:', error);
+    } finally {
+        await tempSequelize.close();
+    }
+}
+
+// Ejecutar la creación de la base de datos
+createDatabaseIfNotExists().catch(console.error);
+
+// 🔗 Conectar a la base de datos
 const sequelize = new Sequelize({
     host: DB_HOST,
     port: Number(DB_PORT),
     username: DB_USER,
     password: DB_PASSWORD,
     database: "logsDB",
-    dialect: DB_DIALECT as any, // Usa la variable de entorno para el dialecto (postgres, mysql, etc.)
-    logging: false, // Desactiva el log de las consultas SQL
+    dialect: DB_DIALECT as any,
+    logging: false,
     define: {
-        freezeTableName: true, // No cambia los nombres de tablas
-        timestamps: false,     // Desactiva timestamps automáticos
+        freezeTableName: true,
+        timestamps: false,
     },
     dialectOptions: {
         ...(DB_DIALECT === 'mysql' && {
-            // Opciones para MySQL, como SSL u otros parámetros
+            // Opciones para MySQL
         }),
         ...(DB_DIALECT === 'postgres' && {
-            // Opciones específicas de PostgreSQL
+            // Opciones para PostgreSQL
         })
     }
 });
 
-// 🔍 Modelo de logs (para CRUDs, autenticación y seguridad)
+// 🔍 Modelo de logs
 class LogEntry extends Model { }
 LogEntry.init(
     {
@@ -34,16 +59,17 @@ LogEntry.init(
         message: { type: DataTypes.TEXT, allowNull: false },
         meta: { type: DataTypes.JSON },
         timestamp: { type: DataTypes.DATE, defaultValue: DataTypes.NOW },
-        hash: { type: DataTypes.STRING, allowNull: false }, // Firma hash
+        hash: { type: DataTypes.STRING, allowNull: false },
     },
     { sequelize, modelName: 'LogEntry' }
 );
 
-// 📌 Función para generar un hash SHA-256 (No repudio)
+// 📌 Función para generar hash SHA-256
 const generateHash = (log: object): string => {
     return crypto.createHash('sha256').update(JSON.stringify(log)).digest('hex');
 };
-// 📌 Implementar transportador personalizado para Winston y Sequelize
+
+// 📌 Transportador personalizado para Winston y Sequelize
 class SequelizeTransport extends Transport {
     constructor(opts?: Transport.TransportStreamOptions) {
         super(opts);
@@ -59,26 +85,34 @@ class SequelizeTransport extends Transport {
                     hash: generateHash(info),
                 });
             } catch (err) {
-                console.error('Error guardando log en la base de datos:', err);
+                console.error('❌ Error guardando log en la base de datos:', err);
             }
         });
         callback();
     }
 }
 
-
 // 🎯 Configuración del logger con Winston
 const logger = createLogger({
     level: 'info',
     format: format.combine(format.timestamp(), format.json()),
     transports: [
-        //new transports.Console(),
         new transports.File({ filename: 'logs/system.log' }),
-        new SequelizeTransport(), // 🚀 Guardar en base de datos
+        new SequelizeTransport(),
     ],
 });
 
-// 🗄️ Sincronizar modelos
-sequelize.sync();
+// 🗄️ Sincronizar modelos y verificar conexión
+sequelize.authenticate()
+    .then(() => {
+        console.log('✅ Conexión establecida correctamente');
+        return sequelize.sync();
+    })
+    .then(() => {
+        console.log('✅ Modelos sincronizados correctamente');
+    })
+    .catch(error => {
+        console.error('❌ Error durante la inicialización:', error);
+    });
 
 export { logger };
