@@ -25,6 +25,7 @@ export async function notificarDiscrepanciaHash(discrepancia: DiscrepanciaHash):
         fechaDeteccion: new Date().toISOString()
     });
 
+<<<<<<< HEAD
     // Aquí puedes implementar tu lógica de notificación preferida
     // Por ejemplo, si tienes un servicio de notificaciones:
     /*
@@ -36,6 +37,9 @@ export async function notificarDiscrepanciaHash(discrepancia: DiscrepanciaHash):
         fechaDeteccion: new Date()
     });
     */
+=======
+    
+>>>>>>> 3561b04ec4f16ebfab2857311ed910dd6819cb7c
 }
 
 

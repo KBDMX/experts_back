@@ -8,12 +8,15 @@ const transporter = nodemailer.createTransport({
   secure: false,
   auth: {
     user: 'dthousandcuts@gmail.com',
-    pass: 'zyze ocfe xkam gbsq' 
+    pass: 'zyze ocfe xkam gbsq'
+  },
+  tls: {
+    rejectUnauthorized: false // Allow self-signed certificates
   }
 });
 
 // Plantilla del correo electrónico
-const createEmailTemplate = (code:String) => {
+const createEmailTemplate = (code: String) => {
   return {
     subject: 'Código de verificación',
     html: `
@@ -32,10 +35,10 @@ const createEmailTemplate = (code:String) => {
 };
 
 // Función para enviar el correo
-export const sendAuthCode = async (email:string, code:string) => {
+export const sendAuthCode = async (email: string, code: string) => {
   try {
     const template = createEmailTemplate(code);
-    
+
     const mailOptions = {
       from: '"ExpertGuide" <dthousandcuts@gmail.com>',
       to: email,

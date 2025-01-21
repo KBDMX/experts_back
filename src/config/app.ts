@@ -40,8 +40,18 @@ import subAgencias from '@routes/mantenimiento/subagencias.route';
 import funcionariosAgrocalidad from '@routes/mantenimiento/funcionarios_agrocalidad.route';
 import bodegueros from '@routes/mantenimiento/bodeguero.route';
 import documento_base from '@routes/documentos/documentos_base/documento_base.route';
+import usuarios from '@routes/usuarios/usuario.route';
+import { createDatabaseIfNotExists, logger } from '@utils/logger';
+import morgan from 'morgan';
 
+import sequelize, { syncDatabase } from './experts.db';
 const app = express();
+
+app.use(
+    morgan('combined', {
+      stream: { write: (message) => logger.info(message.trim()) },
+    })
+  );
 
 // Configuración de Swagger
 const swaggerOptions = {
@@ -86,6 +96,8 @@ app.use(expressjwt({
 // Middleware personalizado adicional (si es necesario)
 app.use(jwtMiddleware);
 
+
+
 app.use('/api/v1/aerolineas', authorize('admin'), aerolineasRouter);
 app.use('/api/v1/unidadesMedida', authorize('admin'), unidadesMedidaRouter);
 app.use('/api/v1/paises', authorize('admin'), paisesRouter);
@@ -106,7 +118,7 @@ app.use('/api/v1/agencias_iata', authorize('admin'), agenciasIata);
 app.use('/api/v1/subagencias', authorize('admin'), subAgencias);
 app.use('/api/v1/funcionarios_agrocalidad', authorize('admin'), funcionariosAgrocalidad);
 app.use('/api/v1/bodegueros', authorize('admin'), bodegueros);
-
+app.use('/api/v1/usuarios', authorize('admin'), usuarios);
 app.use('/api/v1/documentos_base', authorize('admin'), documento_base);
 
 // Rutas
@@ -116,5 +128,11 @@ app.use('/api/v1',
 
 // Middleware para manejo de errores
 app.use(errorHandler);
+
+
+syncDatabase();
+// Ejecutar la creación de la base de datos
+createDatabaseIfNotExists().catch(console.error);
+
 
 export default app;

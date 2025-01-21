@@ -4,4 +4,4 @@ export type Admin = {
     id_usuario: UUID;
 }
 
-export type AdminAtrubutosCreacion = Omit<Admin, 'id_usuario'>;
+export type AdminAtributosCreacion = Omit<Admin, 'id_usuario'>;

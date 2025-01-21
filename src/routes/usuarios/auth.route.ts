@@ -114,6 +114,8 @@ router.post('/login',
         });
 
 router.post('/logout', (req: Request, res: Response) => {
+    const customReq = req as CustomRequest;
+
     res.clearCookie('access_token', {
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',
@@ -142,6 +144,7 @@ router.post('/register',
                 msg: 'Registro exitoso',
             });
         } catch (error) {
+
             next(error);
             return res.status(500).json({
                 ok: false,
