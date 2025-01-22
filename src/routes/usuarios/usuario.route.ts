@@ -14,15 +14,28 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
                 throw new Error('ID inválido');
             }
             const usuario = await getUsuario(id);
-            res.status(200).json({
-                ok: true,
-                data: usuario
-            });
+
+            if (usuario) {
+                // Elimina el campo password del objeto
+                const { pass, ...usuarioSinPassword } = usuario;
+                res.status(200).json({
+                    ok: true,
+                    data: usuarioSinPassword
+                });
+            } else {
+                res.status(404).json({
+                    ok: false,
+                    msg: 'Usuario no encontrado'
+                });
+            }
         } else {
             const usuarios = await getUsuarios();
+            // Elimina el campo password de cada usuario en la lista
+            const usuariosSinPassword = usuarios.map(({ pass, ...resto }) => resto);
+
             res.status(200).json({
                 ok: true,
-                data: usuarios
+                data: usuariosSinPassword
             });
         }
     } catch (error: any) {
