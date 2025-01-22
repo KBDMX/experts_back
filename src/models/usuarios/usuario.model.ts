@@ -14,6 +14,9 @@ const Usuario = sequelize.define<Model<Usuario, UsuarioAtributosCreacion>>('usua
         type: DataTypes.STRING,
         unique: true,
     },
+    rol: {
+        type: DataTypes.STRING,
+    },
     email: {
         type: DataTypes.STRING,
         unique: true,

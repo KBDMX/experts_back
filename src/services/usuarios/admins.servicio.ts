@@ -109,9 +109,12 @@ export async function updateRolUsuario(id: UUID, nuevoRol: string): Promise<Usua
             }
         }
 
-        // 7. Devuelvo el usuario actualizado
-        const usuarioActualizado = await Usuarios.findByPk(id);
-        return usuarioActualizado ? usuarioActualizado.toJSON() as Usuario : null;
+        //7. Actualizar el rol del usuario
+        usuario.set('rol', nuevoRol);
+        await usuario.save();
+
+        //8. Retornar el usuario actualizado
+        return usuario.toJSON() as Usuario;;
     } catch (error) {
         console.error('Error al actualizar rol de usuario:', error);
         throw new Error('No se pudo actualizar el rol del usuario');
