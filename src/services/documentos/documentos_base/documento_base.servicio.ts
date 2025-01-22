@@ -5,41 +5,50 @@ import { DocumentoBaseAttributes, DocumentoBaseCreationAttributes } from "@model
 import Aerolineas from "@models/mantenimiento/aerolinea.model";
 import AgenciaIata from "@models/mantenimiento/agencia_iata";
 import DocumentoBaseStock from "@models/catalogos/documentos/documento_base_stock";
-import { createHash } from 'crypto';
 import { generarDocumentoHash, notificarDiscrepanciaHash, VerificacionHash, verificarIntegridadDocumento } from "../integridad.servicio";
 
-
+/**
+ * Obtiene documentos base con paginación y verifica su integridad
+ */
 export async function getDocumentosBase(page: number = 1, pageSize: number = 10): Promise<{ data: any[], total: number }> {
-    const offset = (page - 1) * pageSize; // Calcular el desplazamiento (offset)
-    const limit = pageSize; // Número de resultados por página
+    const offset = (page - 1) * pageSize;
+    const limit = pageSize;
 
-    // Obtener los documentos base con paginación
     const { rows, count } = await DocumentoBase.findAndCountAll({
         limit,
         offset
     });
 
+    // Verificar la integridad de los documentos obtenidos
+    for (const documento of rows) {
+        const integridad = await verificarIntegridadDocumento(documento.get({ plain: true }));
+        if (!integridad.esValido) {
+            await notificarDiscrepanciaHash({
+                documentoId: (documento as any).id,
+                fecha: (documento as any).fecha,
+                ...integridad
+            });
+        }
+    }
+
     return {
-        data: rows, // Los documentos de la página actual
-        total: count // El número total de documentos
+        data: rows,
+        total: count
     };
 }
 
-
-export async function getDocumentoBase(id: number): Promise<{
-    documento: DocumentoBaseAttributes | null,
-    integridad?: VerificacionHash
-}> {
+/**
+ * Obtiene un documento base por ID y verifica su integridad
+ */
+export async function getDocumentoBase(id: number): Promise<{ documento: DocumentoBaseAttributes | null, integridad?: VerificacionHash }> {
     const documento = await DocumentoBase.findByPk(id) as DocumentoBaseAttributes | null;
-    
+
     if (!documento) {
         return { documento: null };
     }
 
-    // Verificar integridad
     const integridad = await verificarIntegridadDocumento(documento);
-    
-    // Si hay discrepancia, notificar al administrador
+
     if (!integridad.esValido) {
         await notificarDiscrepanciaHash({
             documentoId: documento.id,
@@ -51,44 +60,50 @@ export async function getDocumentoBase(id: number): Promise<{
     return { documento, integridad };
 }
 
-
-/********************************************** */
-
+/**
+ * Crea un documento base y almacena su hash de integridad
+ */
 export async function createDocumentoBase(documento_base: DocumentoBaseCreationAttributes) {
     const hash = generarDocumentoHash(documento_base);
-    return await DocumentoBase.create({ 
-        ...documento_base, 
+    return await DocumentoBase.create({
+        ...documento_base,
         hash,
-        createdAt: new Date(), 
-        updatedAt: new Date() 
+        createdAt: new Date(),
+        updatedAt: new Date()
     });
 }
 
+/**
+ * Actualiza un documento base y recalcula su hash de integridad
+ */
 export async function updateDocumentoBase(documento_base: DocumentoBaseAttributes) {
     const documento_baseToUpdate = await DocumentoBase.findByPk(documento_base.id);
     if (documento_baseToUpdate) {
         const { createdAt, ...updateData } = documento_base;
         const hash = generarDocumentoHash(updateData);
-        
+
         await DocumentoBase.update(
-            { 
-                ...updateData, 
+            {
+                ...updateData,
                 hash,
-                updatedAt: new Date() 
-            }, 
+                updatedAt: new Date()
+            },
             {
                 where: {
                     id: documento_base.id
                 }
             }
         );
-        
+
         return await DocumentoBase.findByPk(documento_base.id);
     }
     return null;
 }
 
-export async function deleteDocumentosBase(ids: any[]) {
+/**
+ * Elimina documentos base
+ */
+export async function deleteDocumentosBase(ids: number[]) {
     await DocumentoBase.destroy({
         where: {
             id: ids
@@ -96,11 +111,9 @@ export async function deleteDocumentosBase(ids: any[]) {
     });
 }
 
-
-
-
-
-
+/**
+ * Crea un documento base y sus guías asociadas, asegurando la integridad de los datos
+ */
 export async function crearDocumentoYGuias(
     documento_base: DocumentoBaseCreationAttributes,
     n_guias: number,
@@ -110,13 +123,13 @@ export async function crearDocumentoYGuias(
     const t = await sequelize.transaction();
     try {
         const hash = generarDocumentoHash(documento_base);
-        
+
         const documento_base_creado: DocumentoBaseAttributes = (await DocumentoBase.create(
-            { 
-                ...documento_base, 
+            {
+                ...documento_base,
                 hash,
-                createdAt: new Date(), 
-                updatedAt: new Date() 
+                createdAt: new Date(),
+                updatedAt: new Date()
             },
             { transaction: t }
         )).get({ plain: true });
@@ -139,6 +152,9 @@ export async function crearDocumentoYGuias(
     }
 }
 
+/**
+ * Simula la creación de un documento base y sus guías para vista previa
+ */
 export async function previewDocumentoBaseYGuias(
     documento_base: DocumentoBaseCreationAttributes,
     n_guias: number,
@@ -147,7 +163,6 @@ export async function previewDocumentoBaseYGuias(
 ): Promise<any> {
     const documento_base_creado = { ...documento_base, createdAt: new Date(), updatedAt: new Date() };
 
-    // Obtener el último documento base para determinar el siguiente ID (opcional)
     const last_documento_base: any = await DocumentoBase.findOne({ order: [['id', 'DESC']] });
 
     if (last_documento_base) {
@@ -156,12 +171,10 @@ export async function previewDocumentoBaseYGuias(
         documento_base_creado.id = 1;
     }
 
-    // Generar los secuenciales siguiendo la lógica especificada
     const secuenciales = generarSecuenciales(secuencial_inicial, n_guias);
 
-    // Simular las guías madre
     const guias = secuenciales.map(sec => ({
-        id_documento_base: documento_base_creado.id, // Actualizamos a un ID simulado
+        id_documento_base: documento_base_creado.id,
         prefijo: prefijo,
         secuencial: sec,
     }));
@@ -169,44 +182,49 @@ export async function previewDocumentoBaseYGuias(
     return { ...documento_base_creado, guias_madre: guias };
 }
 
+/**
+ * Obtiene las guías madre asociadas a un documento base
+ */
 export async function getGuiasMadre(id_documento_base: number): Promise<GuiaMadreAttributes[]> {
     return await GuiaMadre.findAll({ where: { id_documento_base } }) as any as GuiaMadreAttributes[];
 }
 
+/**
+ * Obtiene todas las guías base con paginación y relaciones, y verifica su integridad
+ */
 export async function getGuiasBase(page: number = 1, pageSize: number = 10): Promise<{ data: any[], total: number }> {
-    const offset = (page - 1) * pageSize; // Calcular el desplazamiento (offset)
-    const limit = pageSize; // Número de resultados por página
+    const offset = (page - 1) * pageSize;
+    const limit = pageSize;
 
-    // Obtener todas las guías base con sus guías madre y aplicar paginación
     const { rows, count } = await DocumentoBase.findAndCountAll({
         include: [
-            {
-                model: GuiaMadre,
-                as: 'guias_madre'
-            },
-            {
-                model: Aerolineas,
-                as: 'aerolinea'
-            },
-            {
-                model: AgenciaIata,
-                as: 'referencia'
-            },
-            {
-                model: DocumentoBaseStock,
-                as: 'stock'
-            }
+            { model: GuiaMadre, as: 'guias_madre' },
+            { model: Aerolineas, as: 'aerolinea' },
+            { model: AgenciaIata, as: 'referencia' },
+            { model: DocumentoBaseStock, as: 'stock' }
         ],
         limit,
         offset
     });
 
-    // Devolver los resultados paginados junto con el número total de registros
+    // Verificar la integridad de los documentos base obtenidos
+    for (const documento of rows) {
+        const integridad = await verificarIntegridadDocumento(documento.get({ plain: true }));
+        if (!integridad.esValido) {
+            await notificarDiscrepanciaHash({
+                documentoId: (documento as any).id,
+                fecha: (documento as any).fecha,
+                ...integridad
+            });
+        }
+    }
+
     return {
-        data: rows, // Los registros de la página actual
-        total: count // El número total de registros (sin paginación)
+        data: rows,
+        total: count
     };
 }
+
 
 /**
  * Genera una lista de secuenciales siguiendo una lógica específica:

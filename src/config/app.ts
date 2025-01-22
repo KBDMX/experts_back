@@ -9,6 +9,8 @@ import errorHandler from '@middlewares/errorHandler';
 import { jwtMiddleware } from '@middlewares/jwtMiddleware';
 import { authorize } from '@middlewares/authorize';
 
+import morgan from 'morgan';
+import sequelize, { syncDatabase } from './experts.db';
 
 import {
     SECRET_KEY,
@@ -41,17 +43,36 @@ import funcionariosAgrocalidad from '@routes/mantenimiento/funcionarios_agrocali
 import bodegueros from '@routes/mantenimiento/bodeguero.route';
 import documento_base from '@routes/documentos/documentos_base/documento_base.route';
 import usuarios from '@routes/usuarios/usuario.route';
-import { createDatabaseIfNotExists, logger } from '@utils/logger';
-import morgan from 'morgan';
 
-import sequelize, { syncDatabase } from './experts.db';
+
 const app = express();
+import { createDatabaseIfNotExists, logWithStore } from '@utils/logger';
 
 app.use(
-    morgan('combined', {
-      stream: { write: (message) => logger.info(message.trim()) },
+    morgan((tokens, req, res) => {
+        return JSON.stringify({
+            type: 'http',
+            method: tokens.method(req, res),
+            url: tokens.url(req, res),
+            status: tokens.status(req, res),
+            contentLength: tokens.res(req, res, 'content-length') || '0',
+            responseTime: `${tokens['response-time'](req, res)} ms`,
+            ip: req.ip || req.socket.remoteAddress,
+            userAgent: req.headers['user-agent'],
+        });
+    }, {
+        stream: {
+            write: (message) => {
+                try {
+                    const logData = JSON.parse(message);
+                    logWithStore(logData, 'app'); // Se asegura que el log vaya a AppLog
+                } catch (error) {
+                    console.error("Error parsing Morgan log:", error);
+                }
+            },
+        },
     })
-  );
+);
 
 // Configuración de Swagger
 const swaggerOptions = {
