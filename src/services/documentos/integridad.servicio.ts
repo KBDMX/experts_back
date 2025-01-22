@@ -1,5 +1,7 @@
 import { DocumentoBaseAttributes, DocumentoBaseCreationAttributes } from "@models/documentos/documentos_base/documento_base.model";
 import { createHash } from "crypto";
+import { IntegrityLog, logWithStore } from "@utils/logger";
+import { Op, Sequelize } from "sequelize";
 
 export interface DiscrepanciaHash {
     documentoId: number;
@@ -9,37 +11,45 @@ export interface DiscrepanciaHash {
 }
 
 export async function notificarDiscrepanciaHash(discrepancia: DiscrepanciaHash): Promise<void> {
-    // Aquí implementarías la lógica de notificación según tu sistema
-    // Por ejemplo, podrías:
-    // 1. Guardar en una tabla de logs
-    // 2. Enviar un email
+    const { documentoId, hashAlmacenado, hashCalculado, fecha } = discrepancia;
 
+    try {
+        // Verificar si ya existe un log con el mismo documentoId (extraído correctamente desde JSON)
+        const existingLog = await IntegrityLog.findOne({
+            where: {
+                message: '¡ALERTA! Discrepancia detectada en hash de documento',
+                level: 'warn',
+                [Op.and]: [
+                    Sequelize.literal(`meta->>'documentoId' = '${documentoId}'`)
+                ]
+            }
+        });
 
-    
-    console.error('¡ALERTA! Discrepancia detectada en hash de documento:', {
-        mensaje: 'Se ha detectado una modificación no autorizada en el documento',
-        documentoId: discrepancia.documentoId,
-        fecha: discrepancia.fecha,
-        hashAlmacenado: discrepancia.hashAlmacenado,
-        hashCalculado: discrepancia.hashCalculado,
-        fechaDeteccion: new Date().toISOString()
-    });
+        if (existingLog) {
+            console.log(`⚠️ Log de discrepancia ya existe para el documentoId ${documentoId}, evitando duplicación.`);
+            return;
+        }
 
-    // Aquí puedes implementar tu lógica de notificación preferida
-    // Por ejemplo, si tienes un servicio de notificaciones:
-    /*
-    await NotificacionService.crear({
-        tipo: 'ALERTA_SEGURIDAD',
-        severidad: 'ALTA',
-        mensaje: `Discrepancia en hash detectada - Documento ID: ${discrepancia.documentoId}`,
-        detalles: JSON.stringify(discrepancia),
-        fechaDeteccion: new Date()
-    });
-    */
-    
+        // Insertar el nuevo log solo si no existe
+        await IntegrityLog.create({
+            level: 'warn',
+            message: '¡ALERTA! Discrepancia detectada en hash de documento',
+            meta: {  // Almacenar el JSON de forma correcta sin serializar manualmente
+                documentoId,
+                fecha,
+                hashAlmacenado,
+                hashCalculado,
+                fechaDeteccion: new Date().toISOString(),
+            },
+            timestamp: new Date(),
+            hash: hashCalculado,
+        });
+
+        console.error('❌ ¡ALERTA! Discrepancia detectada en hash de documento:', discrepancia);
+    } catch (error) {
+        console.error('❌ Error al verificar o insertar en IntegrityLog:', error);
+    }
 }
-
-
 /**********PARA EL HASH************/
 export function generarDocumentoHash(documento: DocumentoBaseAttributes | DocumentoBaseCreationAttributes): string {
     const relevantData = {
@@ -49,7 +59,7 @@ export function generarDocumentoHash(documento: DocumentoBaseAttributes | Docume
         id_stock: documento.id_stock,
         timestamp: new Date().getTime()
     };
-    
+
     return createHash('sha256')
         .update(JSON.stringify(relevantData))
         .digest('hex');
@@ -64,10 +74,21 @@ export interface VerificacionHash {
 export async function verificarIntegridadDocumento(documento: DocumentoBaseAttributes): Promise<VerificacionHash> {
     // Recalcular el hash
     const hashCalculado = generarDocumentoHash(documento);
-    
-    return {
+
+    const resultado = {
         esValido: documento.hash === hashCalculado,
         hashAlmacenado: documento.hash,
         hashCalculado: hashCalculado
     };
+
+    if (!resultado.esValido) {
+        await notificarDiscrepanciaHash({
+            documentoId: documento.id,
+            fecha: new Date().toISOString(),
+            hashAlmacenado: resultado.hashAlmacenado,
+            hashCalculado: resultado.hashCalculado
+        });
+    }
+
+    return resultado;
 }
