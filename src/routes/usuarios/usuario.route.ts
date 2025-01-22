@@ -1,8 +1,9 @@
 import express, { Request, Response, NextFunction } from 'express';
 import { createUsuario, deleteUsuario, getUsuario, getUsuarios, updateUsuario } from '@services/usuarios/usuarios.servicio';
-import { body } from 'express-validator';
+import { body, param } from 'express-validator';
 import validationMiddleware from '@middlewares/validationMiddleware';
-import { updateRolUsuario } from '@services/usuarios/admins.servicio';
+import { deleteUser, updateRolUsuario } from '@services/usuarios/admins.servicio';
+import { UUID } from 'sequelize';
 
 const router = express.Router();
 
@@ -43,7 +44,7 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
     }
 });
 
-// PUT /aerolineas
+// PUT /usuarios
 router.put('/',
     [
         body('id_usuario').isUUID().withMessage('ID de usuario no sigue el formato UUID'),
@@ -54,11 +55,23 @@ router.put('/',
     async (req: Request, res: Response, next: NextFunction) => {
         try {
             await updateRolUsuario(req.body.id_usuario, req.body.rol);
-            res.status(200).json({ ok: true, msg: 'Actualizando rol de usuario' });
+            res.status(200).json({ ok: true, msg: 'Actualizado rol de usuario' });
         } catch (error) {
             next(error);
         }
     }
 );
+// Delete/usuarios
+router.delete('/:id_usuario', [
+    param('id_usuario').isUUID().withMessage('ID de usuario no sigue el formato UUID'),
+], validationMiddleware, async (req: Request, res: Response, next: NextFunction) => {
+    try {
+        const { id_usuario } = req.params;
+        await deleteUser(id_usuario as any);
+        res.json({ ok: true, msg: 'Usuario eliminado' });
+    } catch (error) {
+        next(error);
+    }
+});
 
 export default router;

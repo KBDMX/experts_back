@@ -74,7 +74,40 @@ const roles: { [key: string]: RolModel } = {
     "finca": Finca
 };
 
+export async function deleteUser(id: UUID): Promise<Usuario | null> {
+    // 1. Verificar si el usuario existe en la base de datos
+    const usuario = await Usuarios.findByPk(id);
+    if (!usuario) {
+        throw new Error('Usuario no encontrado, no se puede eliminar');
+    } 
+    const rol = (usuario as any).rol; 
+    // 2. Verificar si el nuevo rol existe en la definición de roles
+    if (!rol || !roles[rol]) {
+        await Usuarios.destroy({
+            where: {
+                id_usuario: id
+            }
+        });
+        return usuario.toJSON() as Usuario;
+    }
+    // 3. Obtener la entidad del nuevo rol
+    const Rol = roles[rol];
+    // eliminamos el usuario
+    await Rol.destroy({
+        where: {
+            id_usuario: id
+        }
+    });
+    await Usuarios.destroy({
+        where: {
+            id_usuario: id
+        }
+    });
+    return usuario.toJSON() as Usuario;
+}
+
 export async function updateRolUsuario(id: UUID, nuevoRol: string): Promise<Usuario | null> {
+    console.log('id:', id, 'nuevoRol:', nuevoRol);
     try {
         // 1. Verificar si el usuario existe en la base de datos
         const usuario = await Usuarios.findByPk(id);
