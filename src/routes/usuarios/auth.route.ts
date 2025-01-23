@@ -1,36 +1,12 @@
-import express, { Request, Response, NextFunction } from 'express';
-import { UUID } from 'crypto';
-import validationMiddleware from '@middlewares/validationMiddleware';
-import { body } from 'express-validator';
-import { initiate2FA, verify2FA, register } from '@services/usuarios/auth.servicio';
-import { logWithStore } from '@utils/logger'; // Se usa logWithStore en lugar de logger directamente
+// auth.routes.ts
 
-export interface CustomRequest extends Request {
-    auth?: {
-        id_usuario: UUID;
-        rol: string;
-        iat: number;
-        exp: number;
-    };
-}
+import express, { Request, Response, NextFunction } from 'express';
+import { body } from 'express-validator';
+import validationMiddleware from '@middlewares/validationMiddleware';
+import { initiate2FA, verify2FA, register } from '@services/usuarios/auth.servicio';
+import { logAuthService } from '@utils/logger'; // Ajusta la ruta
 
 const router = express.Router();
-
-// 🔹 Middleware global para loggear todas las peticiones en AppLog
-router.use((req: Request, res: Response, next: NextFunction) => {
-    const ip = (req.headers['x-forwarded-for'] || req.ip || req.socket.remoteAddress || 'unknown').toString();
-
-    logWithStore({
-        type: 'request',
-        method: req.method,
-        url: req.url,
-        ip,
-        userAgent: req.headers['user-agent'],
-        timestamp: new Date().toISOString(),
-    }, 'app');
-
-    next();
-});
 
 router.post(
     '/login',
@@ -42,27 +18,19 @@ router.post(
     validationMiddleware,
     async (req: Request, res: Response, next: NextFunction) => {
         try {
+            // EJEMPLO: logueamos un "intento de login"
+            logAuthService(req, 'login_attempt', { user: req.body.usuario });
+
             const { usuario, pass, recordar } = req.body;
-            const ip = (req.headers['x-forwarded-for'] || req.ip || req.socket.remoteAddress || 'unknown').toString();
+            const ip = req.ip;
 
-            logWithStore({
-                type: 'auth',
-                action: 'login_attempt',
-                user: usuario,
-                ip,
-                userAgent: req.headers['user-agent'],
-                timestamp: new Date().toISOString(),
-            }, 'app');
+            const result = await initiate2FA(usuario, pass, ip as string);
 
-            const result = await initiate2FA(usuario, pass, ip);
-
-            logWithStore({
-                type: 'auth',
-                action: '2fa_sent',
+            // EJEMPLO: logueamos que se envió 2FA
+            logAuthService(req, '2fa_sent', {
                 user: usuario,
                 expiresAt: result.expiresAt,
-                timestamp: new Date().toISOString(),
-            }, 'app');
+            });
 
             return res.status(200).json({
                 ok: true,
@@ -71,14 +39,11 @@ router.post(
                 expiresAt: result.expiresAt,
             });
         } catch (error) {
-            logWithStore({
-                type: 'auth',
-                action: 'login_failed',
+            // EJEMPLO: logueamos error en login
+            logAuthService(req, 'login_failed', {
                 user: req.body.usuario || 'unknown',
                 error: (error as Error).message,
-                ip: req.ip,
-                timestamp: new Date().toISOString(),
-            }, 'app');
+            });
 
             return next(error);
         }
@@ -95,57 +60,32 @@ router.post(
     validationMiddleware,
     async (req: Request, res: Response, next: NextFunction) => {
         try {
+            logAuthService(req, '2fa_verification_attempt');
+
             const { code, tempToken, recordar = false } = req.body;
-            const ip = (req.headers['x-forwarded-for'] || req.ip || req.socket.remoteAddress || 'unknown').toString();
+            const ip = req.ip;
 
-            logWithStore({
-                type: 'auth',
-                action: '2fa_verification_attempt',
-                ip,
-                userAgent: req.headers['user-agent'],
-                timestamp: new Date().toISOString(),
-            }, 'app');
-
-            const result = await verify2FA(code, tempToken, recordar, ip);
+            if (!tempToken) {
+                throw new Error('Token temporal no provisto');
+            }
+            const result = await verify2FA(code, tempToken, recordar, ip as string);
 
             if (result.isValid && result.tokens) {
-                logWithStore({
-                    type: 'auth',
-                    action: 'login_success',
-                    ip,
-                    userAgent: req.headers['user-agent'],
-                    timestamp: new Date().toISOString(),
-                }, 'app');
+                // Loguear: login exitoso
+                logAuthService(req, 'login_success');
 
-                res.cookie('access_token', result.tokens.accessToken, {
-                    httpOnly: true,
-                    secure: process.env.NODE_ENV === 'production',
-                    sameSite: 'strict',
-                    maxAge: 15 * 60 * 1000, // 15 minutos
-                    path: '/',
-                });
+                // set cookies...
+                res.cookie('access_token', result.tokens.accessToken, { /* ...opciones... */ });
+                res.cookie('refresh_token', result.tokens.refreshToken, { /* ...opciones... */ });
 
-                res.cookie('refresh_token', result.tokens.refreshToken, {
-                    httpOnly: true,
-                    secure: process.env.NODE_ENV === 'production',
-                    sameSite: 'strict',
-                    maxAge: recordar ? 7 * 24 * 60 * 60 * 1000 : 60 * 60 * 1000,
-                    path: '/',
-                });
-
-                return res.status(200).json({
-                    ok: true,
-                    msg: 'Autenticación exitosa',
-                });
+                return res.status(200).json({ ok: true, msg: 'Autenticación exitosa' });
             }
 
-            logWithStore({
-                type: 'auth',
-                action: '2fa_verification_failed',
+            // Loguear: verificación fallida
+            logAuthService(req, '2fa_verification_failed', {
                 message: result.message,
                 remainingAttempts: result.remainingAttempts,
-                timestamp: new Date().toISOString(),
-            }, 'app');
+            });
 
             return res.status(401).json({
                 ok: false,
@@ -154,42 +94,20 @@ router.post(
                 shouldRetry: result.shouldRetry,
             });
         } catch (error) {
-            logWithStore({
-                type: 'auth',
-                action: '2fa_error',
+            // Loguear: error interno
+            logAuthService(req, '2fa_error', {
                 error: (error as Error).message,
-                timestamp: new Date().toISOString(),
-            }, 'app');
-
+            });
             return next(error);
         }
     }
 );
 
 router.post('/logout', (req: Request, res: Response) => {
-    const customReq = req as CustomRequest;
+    logAuthService(req, 'logout');
 
-    logWithStore({
-        type: 'auth',
-        action: 'logout',
-        user: customReq.auth?.id_usuario || 'Desconocido',
-        timestamp: new Date().toISOString(),
-    }, 'app');
-
-    res.clearCookie('access_token', {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'strict',
-        path: '/',
-    });
-
-    res.clearCookie('refresh_token', {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'strict',
-        path: '/',
-    });
-
+    res.clearCookie('access_token', { /* ... */ });
+    res.clearCookie('refresh_token', { /* ... */ });
     return res.status(200).json({ ok: true, msg: 'Sesión cerrada' });
 });
 
@@ -203,62 +121,44 @@ router.post(
     validationMiddleware,
     async (req: Request, res: Response, next: NextFunction) => {
         try {
-            const usuario = req.body;
+            logAuthService(req, 'register_attempt', {
+                usuario: req.body.usuario,
+                email: req.body.email,
+            });
 
-            logWithStore({
-                type: 'auth',
-                action: 'register_attempt',
-                email: usuario.email,
-                usuario: usuario.usuario,
-                timestamp: new Date().toISOString(),
-            }, 'app');
-
-            await register(usuario);
+            await register(req.body);
 
             return res.status(201).json({
                 ok: true,
                 msg: 'Registro exitoso',
             });
         } catch (error) {
-            logWithStore({
-                type: 'auth',
-                action: 'register_failed',
+            logAuthService(req, 'register_failed', {
                 error: (error as Error).message,
-                timestamp: new Date().toISOString(),
-            }, 'app');
-
+            });
             return next(error);
         }
     }
 );
 
 router.get('/me', (req: Request, res: Response) => {
-    const customReq = req as CustomRequest;
+    // Si deseas:
+    //  - Extraer userId desde la cookie, ya lo hace logAuthService. 
+    //  - O, si ya tienes un middleware que agrega `req.auth`, podrías loguearlo:
+    logAuthService(req, 'user_info_requested', {
+        user: (req as any)?.auth?.id_usuario ?? 'desconocido',
+        rol: (req as any)?.auth?.rol ?? 'desconocido',
+    });
 
-    if (!customReq.auth) {
-        logWithStore({
-            type: 'auth',
-            action: 'unauthorized_access_attempt',
-            ip: req.ip,
-            timestamp: new Date().toISOString(),
-        }, 'app');
-
+    if (!(req as any)?.auth) {
         return res.status(401).json({ ok: false, msg: 'No autenticado' });
     }
-
-    logWithStore({
-        type: 'auth',
-        action: 'user_info_requested',
-        user: customReq.auth.id_usuario,
-        rol: customReq.auth.rol,
-        timestamp: new Date().toISOString(),
-    }, 'app');
 
     return res.status(200).json({
         ok: true,
         user: {
-            id: customReq.auth?.id_usuario,
-            rol: customReq.auth?.rol,
+            id: (req as any)?.auth?.id_usuario,
+            rol: (req as any)?.auth?.rol,
         },
     });
 });

@@ -1,9 +1,10 @@
+// usuarios.routes.ts
 import express, { Request, Response, NextFunction } from 'express';
-import { createUsuario, deleteUsuario, getUsuario, getUsuarios, updateUsuario } from '@services/usuarios/usuarios.servicio';
+import { getUsuario, getUsuarios } from '@services/usuarios/usuarios.servicio';
+import { updateRolUsuario, deleteUser } from '@services/usuarios/admins.servicio';
 import { body, param } from 'express-validator';
 import validationMiddleware from '@middlewares/validationMiddleware';
-import { deleteUser, updateRolUsuario } from '@services/usuarios/admins.servicio';
-import { UUID } from 'sequelize';
+import { logUsuariosService } from '@utils/logger'; // Ajusta la ruta de tu import
 
 const router = express.Router();
 
@@ -17,26 +18,33 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
             const usuario = await getUsuario(id);
 
             if (usuario) {
-                // Elimina el campo password del objeto
                 const { pass, ...usuarioSinPassword } = usuario;
+
+                // Registrar en la nueva tabla:
+                logUsuariosService(req, 'Get usuario by ID', { userIdBuscado: id });
+
                 res.status(200).json({
                     ok: true,
-                    data: usuarioSinPassword
+                    data: usuarioSinPassword,
                 });
             } else {
                 res.status(404).json({
                     ok: false,
-                    msg: 'Usuario no encontrado'
+                    msg: 'Usuario no encontrado',
                 });
             }
         } else {
             const usuarios = await getUsuarios();
-            // Elimina el campo password de cada usuario en la lista
             const usuariosSinPassword = usuarios.map(({ pass, ...resto }) => resto);
+
+            // Registrar en la nueva tabla:
+            logUsuariosService(req, 'Get todos los usuarios', {
+                totalUsuarios: usuariosSinPassword.length,
+            });
 
             res.status(200).json({
                 ok: true,
-                data: usuariosSinPassword
+                data: usuariosSinPassword,
             });
         }
     } catch (error: any) {
@@ -45,33 +53,50 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
 });
 
 // PUT /usuarios
-router.put('/',
+router.put(
+    '/',
     [
         body('id_usuario').isUUID().withMessage('ID de usuario no sigue el formato UUID'),
         body('rol').isString().withMessage('El rol debe ser un string'),
-        // Añadir más validaciones según sea necesario
     ],
     validationMiddleware,
     async (req: Request, res: Response, next: NextFunction) => {
         try {
             await updateRolUsuario(req.body.id_usuario, req.body.rol);
+
+            // Registrar el evento
+            logUsuariosService(req, 'Actualizar rol', {
+                userIdActualizado: req.body.id_usuario,
+                nuevoRol: req.body.rol,
+            });
+
             res.status(200).json({ ok: true, msg: 'Actualizado rol de usuario' });
         } catch (error) {
             next(error);
         }
     }
 );
-// Delete/usuarios
-router.delete('/:id_usuario', [
-    param('id_usuario').isUUID().withMessage('ID de usuario no sigue el formato UUID'),
-], validationMiddleware, async (req: Request, res: Response, next: NextFunction) => {
-    try {
-        const { id_usuario } = req.params;
-        await deleteUser(id_usuario as any);
-        res.json({ ok: true, msg: 'Usuario eliminado' });
-    } catch (error) {
-        next(error);
+
+// DELETE /usuarios/:id_usuario
+router.delete(
+    '/:id_usuario',
+    [param('id_usuario').isUUID().withMessage('ID de usuario no sigue el formato UUID')],
+    validationMiddleware,
+    async (req: Request, res: Response, next: NextFunction) => {
+        try {
+            const { id_usuario } = req.params;
+            await deleteUser(id_usuario as any);
+
+            // Registrar el evento
+            logUsuariosService(req, 'Eliminar usuario', {
+                userIdEliminado: id_usuario,
+            });
+
+            res.json({ ok: true, msg: 'Usuario eliminado' });
+        } catch (error) {
+            next(error);
+        }
     }
-});
+);
 
 export default router;

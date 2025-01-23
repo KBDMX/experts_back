@@ -1,5 +1,5 @@
 // src/app.ts
-import express from 'express';
+import express, { Request, Response, NextFunction } from 'express';
 import cookieParser from 'cookie-parser';
 import cors from 'cors';
 import { expressjwt } from 'express-jwt';
@@ -11,6 +11,7 @@ import { authorize } from '@middlewares/authorize';
 
 import morgan from 'morgan';
 import sequelize, { syncDatabase } from './experts.db';
+import jwt from 'jsonwebtoken';
 
 import {
     SECRET_KEY,
@@ -43,36 +44,48 @@ import funcionariosAgrocalidad from '@routes/mantenimiento/funcionarios_agrocali
 import bodegueros from '@routes/mantenimiento/bodeguero.route';
 import documento_base from '@routes/documentos/documentos_base/documento_base.route';
 import usuarios from '@routes/usuarios/usuario.route';
-
+import { createDatabaseIfNotExists, logWithStore, parseAndStoreLog } from '@utils/logger';
 
 const app = express();
-import { createDatabaseIfNotExists, logWithStore } from '@utils/logger';
+app.use(express.json());
+app.use(cookieParser());
 
-app.use(
-    morgan((tokens, req, res) => {
-        return JSON.stringify({
-            type: 'http',
-            method: tokens.method(req, res),
-            url: tokens.url(req, res),
-            status: tokens.status(req, res),
-            contentLength: tokens.res(req, res, 'content-length') || '0',
-            responseTime: `${tokens['response-time'](req, res)} ms`,
-            ip: req.ip || req.socket.remoteAddress,
-            userAgent: req.headers['user-agent'],
-        });
-    }, {
-        stream: {
-            write: (message) => {
-                try {
-                    const logData = JSON.parse(message);
-                    logWithStore(logData, 'app'); // Se asegura que el log vaya a AppLog
-                } catch (error) {
-                    console.error("Error parsing Morgan log:", error);
-                }
-            },
+
+
+app.use((req: Request, res: Response, next: NextFunction) => {
+    // Aquí definimos qué formateará Morgan
+    const morganMiddleware = morgan(
+        (tokens, req, res) => {
+            // Construimos un objeto base
+            const baseLog = {
+                type: 'http',
+                method: tokens.method(req, res),
+                url: tokens.url(req, res),
+                status: tokens.status(req, res),
+                contentLength: tokens.res(req, res, 'content-length') || '0',
+                responseTime: `${tokens['response-time'](req, res)} ms`,
+                ip: req.headers['x-forwarded-for'] || req.connection.remoteAddress,
+                userAgent: req.headers['user-agent'],
+                // Un mensaje "por defecto" (Sequelize requiere un message no nulo)
+                message: `Request ${tokens.method(req, res)} ${tokens.url(req, res)}`,
+            };
+
+            // Convertimos a string para que Morgan lo “emita”
+            return JSON.stringify(baseLog);
         },
-    })
-);
+        {
+            stream: {
+                // En el stream de Morgan, llamamos a nuestra función parseAndStoreLog
+                write: (rawMessage: string) => {
+                    parseAndStoreLog(rawMessage, req, 'app');
+                },
+            },
+        }
+    );
+
+    // Ejecutamos el morganMiddleware con la request/response actual
+    morganMiddleware(req, res, next);
+});
 
 // Configuración de Swagger
 const swaggerOptions = {
@@ -100,8 +113,6 @@ app.use(cors({
     credentials: true,
 }));
 
-app.use(express.json());
-app.use(cookieParser());
 
 // Middleware JWT
 app.use(expressjwt({
