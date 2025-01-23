@@ -46,9 +46,15 @@ import documento_base from '@routes/documentos/documentos_base/documento_base.ro
 import usuarios from '@routes/usuarios/usuario.route';
 import { createDatabaseIfNotExists, logWithStore, parseAndStoreLog } from '@utils/logger';
 
+
+import { xssProtection } from '@middlewares/xssProtection';
+
+
+
 const app = express();
 app.use(express.json());
 app.use(cookieParser());
+app.use(xssProtection());
 
 
 
