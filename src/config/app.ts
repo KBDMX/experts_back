@@ -44,6 +44,10 @@ import funcionariosAgrocalidad from '@routes/mantenimiento/funcionarios_agrocali
 import bodegueros from '@routes/mantenimiento/bodeguero.route';
 import documento_base from '@routes/documentos/documentos_base/documento_base.route';
 import usuarios from '@routes/usuarios/usuario.route';
+import asignacion from '@routes/documentos/centro_guias/asignacion.route';
+import guia_madre from '@routes/documentos/documentos_base/guia_madre.route';
+
+
 import { createDatabaseIfNotExists, logWithStore, parseAndStoreLog } from '@utils/logger';
 
 
@@ -158,6 +162,8 @@ app.use('/api/v1/funcionarios_agrocalidad', authorize('admin'), funcionariosAgro
 app.use('/api/v1/bodegueros', authorize('admin'), bodegueros);
 app.use('/api/v1/usuarios', authorize('admin'), usuarios);
 app.use('/api/v1/documentos_base', authorize('admin'), documento_base);
+app.use('/api/v1/asignacion', authorize('admin'), asignacion);
+app.use('/api/v1/guia_madre', authorize('admin'), guia_madre);
 
 // Rutas
 app.use('/api/v1',
