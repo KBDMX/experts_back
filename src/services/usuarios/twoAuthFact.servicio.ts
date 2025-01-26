@@ -34,12 +34,24 @@ export class TwoFactorAuthService {
     private readonly BLOCK_TIME = 30 * 60; // 30 minutos en segundos
 
     constructor() {
-        this.redis = new Redis({
-            host: process.env.REDIS_HOST || 'localhost',
-            port: Number(process.env.REDIS_PORT) || 6379,
-            password: process.env.REDIS_PASSWORD,
-            tls: process.env.NODE_ENV === 'production' ? {} : undefined
-        });
+        const redisUrl = process.env.REDIS_URL;  // URL completa si está definida
+
+        if (redisUrl) {
+            // Si hay una URL completa, la usamos directamente
+            this.redis = new Redis(redisUrl, {
+                tls: process.env.NODE_ENV === 'production' ? {} : undefined
+            });
+            console.log(`Conectando a Redis usando REDIS_URL: ${redisUrl}`);
+        } else {
+            // Si no hay URL completa, usamos host, puerto y contraseña manualmente
+            this.redis = new Redis({
+                host: process.env.REDIS_HOST || 'localhost',
+                port: Number(process.env.REDIS_PORT) || 6379,
+                password: process.env.REDIS_PASSWORD || undefined,
+                tls: process.env.NODE_ENV === 'production' ? {} : undefined
+            });
+            console.log(`Conectando a Redis usando host: ${process.env.REDIS_HOST}, puerto: ${process.env.REDIS_PORT}`);
+        }
 
         // Manejo de eventos de Redis
         this.redis.on('error', (error) => {
@@ -105,7 +117,7 @@ export class TwoFactorAuthService {
         const isBlocked = await this.redis.exists(keys.blocked);
         if (isBlocked) {
             const ttl = await this.redis.ttl(keys.blocked);
-            
+
             logFailedAttempt({
                 userId,
                 timestamp: new Date(),
@@ -152,9 +164,9 @@ export class TwoFactorAuthService {
                     this.redis.del(keys.code),
                     this.redis.del(keys.attempts)
                 ]);
-                
+
                 console.log(`Usuario ${userId} bloqueado por exceder el máximo de intentos`);
-                
+
                 return {
                     isValid: false,
                     shouldRetry: false,
