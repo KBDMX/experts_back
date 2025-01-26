@@ -133,5 +133,9 @@
   ],
   "exclude": [
     "node_modules"
+  ],
+  "types": [
+    "node",
+    "ioredis"
   ]
 }
