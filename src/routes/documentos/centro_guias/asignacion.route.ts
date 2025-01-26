@@ -7,7 +7,7 @@ import {
     updateDocumentoCoordinacion,
     deleteDocumentoCoordinacion,
     getAvailableAerolineas,
-    
+
 } from '@services/documentos/centro_guias/documento_coordinacion.servicio';
 
 const router = Router();
@@ -30,6 +30,8 @@ router.get('/',
         }
     }
 );
+
+
 
 // Crear un nuevo documento de coordinación
 router.post('/',

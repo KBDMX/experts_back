@@ -46,7 +46,7 @@ import documento_base from '@routes/documentos/documentos_base/documento_base.ro
 import usuarios from '@routes/usuarios/usuario.route';
 import asignacion from '@routes/documentos/centro_guias/asignacion.route';
 import guia_madre from '@routes/documentos/documentos_base/guia_madre.route';
-
+import coordinacion_finca from '@routes/documentos/centro_guias/coordinacion_fincas.route';
 
 import { createDatabaseIfNotExists, logWithStore, parseAndStoreLog } from '@utils/logger';
 
@@ -164,6 +164,7 @@ app.use('/api/v1/usuarios', authorize('admin'), usuarios);
 app.use('/api/v1/documentos_base', authorize('admin'), documento_base);
 app.use('/api/v1/asignacion', authorize('admin'), asignacion);
 app.use('/api/v1/guia_madre', authorize('admin'), guia_madre);
+app.use('/api/v1/coordinacion_finca', authorize('finca'), coordinacion_finca);
 
 // Rutas
 app.use('/api/v1',

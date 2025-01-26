@@ -9,10 +9,12 @@ import { Usuario, UsuarioAtributosCreacion } from "@typesApp/usuarios/usuario.ty
 import { SECRET_KEY, BY_SALT, SECRET_REFRESH_KEY } from "@db/config";
 import { sendAuthCode } from '@services/usuarios/correo.servicio';
 import { UUID } from 'crypto';
+import Finca from '@models/usuarios/fincas.model';
 
 // Mapa de roles y sus tablas correspondientes
 const roleTableMap: { [key: string]: any } = {
     admin: Admins,
+    finca: Finca
     // Agrega otros roles y sus tablas aquí
     // ejemplo: "editor": Editors,
     // "manager": Managers,
@@ -47,6 +49,7 @@ export async function isUserInRole(userId: UUID, role: string): Promise<boolean>
 export async function getUserRole(userId: UUID): Promise<string | null> {
     for (const role of Object.keys(roleTableMap)) {
         const isInRole = await isUserInRole(userId, role);
+
         if (isInRole) {
             return role;
         }
@@ -65,10 +68,10 @@ export async function initiate2FA(
 }> {
     // Validar credenciales
     const user = await validateCredentials(usuario, pass);
-    
+
     // Generar código 2FA
     const twoFactorResponse = await twoFactorService.generateTwoFactorCode(user.id_usuario.toString());
-    
+
     // Enviar código por correo
     if (user.email) {
         await sendAuthCode(user.email, twoFactorResponse.code);
@@ -138,21 +141,21 @@ export async function verify2FA(
             // Obtener rol del usuario y generar tokens finales
             console.log('Código 2FA válido. Obteniendo rol del usuario...');
             const userRole = await getUserRole(userId);
-            
+
             if (!userRole) {
                 console.error('Error: Usuario sin rol asignado. ID:', userId);
                 throw new Error('El usuario no tiene un rol asignado');
             }
-            
+
             console.log('Generando tokens de autenticación para usuario:', {
                 userId,
                 role: userRole,
                 mantenerSesion
             });
-            
+
             const tokens = await generateAuthTokens(userId, userRole, mantenerSesion);
             console.log('Tokens generados exitosamente');
-            
+
             return {
                 ...verificationResult,
                 tokens

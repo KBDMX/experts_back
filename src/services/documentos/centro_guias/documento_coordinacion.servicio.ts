@@ -10,6 +10,8 @@ import Aerolineas from "@models/mantenimiento/aerolinea.model";
 import CoordinacionClientes from "@models/documentos/centro_guias/coordinacion_clientes.model";
 import DocumentoBase from "@models/documentos/documentos_base/documento_base.model";
 import { get } from "node:https";
+import GuiaHija from "@models/documentos/centro_guias/guias_hija.model";
+import { UUID } from "node:crypto";
 
 export async function getDocumentosCoordinacion(page: number = 1, pageSize: number = 10): Promise<{ data: any[], total: number }> {
     const offset = (page - 1) * pageSize; // Calcular el desplazamiento (offset)
@@ -246,4 +248,18 @@ export async function getAvailableAerolineas(): Promise<any[]> {
         ]
     });
     return aerolineas;
+}
+
+export async function getDocumentosCoordinacionByFinca(id_finca: UUID): Promise<any[]> {
+    const documentos = await DocumentoCoordinacion.findAll({
+        include: [
+            {
+                model: GuiaHija,
+                as: 'guias_hijas',
+                where: { id_finca: id_finca },
+                required: false
+            }
+        ]
+    });
+    return documentos;
 }

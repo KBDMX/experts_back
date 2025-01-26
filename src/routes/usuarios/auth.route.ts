@@ -3,7 +3,7 @@
 import express, { Request, Response, NextFunction } from 'express';
 import { body } from 'express-validator';
 import validationMiddleware from '@middlewares/validationMiddleware';
-import { initiate2FA, verify2FA, register } from '@services/usuarios/auth.servicio';
+import { initiate2FA, verify2FA, register, getUserRole } from '@services/usuarios/auth.servicio';
 import { logAuthService } from '@utils/logger'; // Ajusta la ruta
 
 const router = express.Router();
@@ -141,7 +141,7 @@ router.post(
     }
 );
 
-router.get('/me', (req: Request, res: Response) => {
+router.get('/me', async (req: Request, res: Response) => {
     // Si deseas:
     //  - Extraer userId desde la cookie, ya lo hace logAuthService. 
     //  - O, si ya tienes un middleware que agrega `req.auth`, podrías loguearlo:
@@ -158,7 +158,7 @@ router.get('/me', (req: Request, res: Response) => {
         ok: true,
         user: {
             id: (req as any)?.auth?.id_usuario,
-            rol: (req as any)?.auth?.rol,
+            rol: await getUserRole((req as any)?.auth?.id_usuario),
         },
     });
 });
