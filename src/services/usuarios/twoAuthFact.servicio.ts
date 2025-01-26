@@ -38,9 +38,7 @@ export class TwoFactorAuthService {
 
         if (redisUrl) {
             // Si hay una URL completa, la usamos directamente
-            this.redis = new Redis(redisUrl, {
-                tls: process.env.NODE_ENV === 'production' ? {} : undefined
-            });
+            this.redis = new Redis(redisUrl);
             console.log(`Conectando a Redis usando REDIS_URL: ${redisUrl}`);
         } else {
             // Si no hay URL completa, usamos host, puerto y contraseña manualmente
