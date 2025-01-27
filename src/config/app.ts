@@ -119,10 +119,14 @@ const swaggerOptions = {
 const swaggerDocs = swaggerJsdoc(swaggerOptions);
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocs));
 
-app.use(cors({
-    origin: true,  // Permitir cualquier origen temporalmente
-    credentials: true,
-}));
+app.use(
+    cors({
+        origin: process.env.CLIENT_URL || 'http://localhost:3000', // URL del frontend
+        credentials: true, // Permite enviar cookies
+        methods: ['GET', 'POST', 'PUT', 'DELETE'],
+        allowedHeaders: ['Content-Type', 'Authorization'],
+    })
+);
 
 
 // Middleware JWT

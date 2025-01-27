@@ -74,9 +74,19 @@ router.post(
                 // Loguear: login exitoso
                 logAuthService(req, 'login_success');
 
-                // set cookies...
-                res.cookie('access_token', result.tokens.accessToken, { /* ...opciones... */ });
-                res.cookie('refresh_token', result.tokens.refreshToken, { /* ...opciones... */ });
+                res.cookie('access_token', result.tokens.accessToken, {
+                    httpOnly: true, // Evita acceso desde JavaScript
+                    secure: process.env.NODE_ENV === 'production', // Solo en HTTPS en producción
+                    sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax', // Permite cross-origin cookies en producción
+                    path: '/', // Disponible en todas las rutas
+                });
+                res.cookie('refresh_token', result.tokens.refreshToken, {
+                    httpOnly: true,
+                    secure: process.env.NODE_ENV === 'production',
+                    sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax', // Permite cross-origin cookies en producción
+
+                    path: '/',
+                });
 
                 return res.status(200).json({ ok: true, msg: 'Autenticación exitosa' });
             }

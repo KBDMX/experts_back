@@ -36,7 +36,8 @@ interface TempTokenPayload {
 export async function isUserInRole(userId: UUID, role: string): Promise<boolean> {
     const roleTable = roleTableMap[role];
     if (!roleTable) {
-        throw new Error(`El rol ${role} no está definido en el mapa de roles`);
+        //throw new Error(`El rol ${role} no está definido en el mapa de roles`);
+        return false;
     }
 
     const user = await roleTable.findOne({
@@ -70,10 +71,10 @@ export async function initiate2FA(
     const user = await validateCredentials(usuario, pass);
 
     // Generar código 2FA
-    const twoFactorResponse = await twoFactorService.generateTwoFactorCode(user.id_usuario.toString());
+    const twoFactorResponse = await twoFactorService.generateTwoFactorCode(user!.id_usuario.toString());
 
     // Enviar código por correo
-    if (user.email) {
+    if (user?.email) {
         await sendAuthCode(user.email, twoFactorResponse.code);
     } else {
         throw new Error('El usuario no tiene un correo electrónico válido');
@@ -144,7 +145,13 @@ export async function verify2FA(
 
             if (!userRole) {
                 console.error('Error: Usuario sin rol asignado. ID:', userId);
-                throw new Error('El usuario no tiene un rol asignado');
+                //throw new Error('El usuario no tiene un rol asignado');
+                return {
+                    isValid: false,
+                    shouldRetry: false,
+                    remainingAttempts: 0,
+                    message: 'El usuario no tiene un rol asignado'
+                };
             }
 
             console.log('Generando tokens de autenticación para usuario:', {
@@ -167,7 +174,13 @@ export async function verify2FA(
     } catch (error) {
         if (error instanceof jwt.TokenExpiredError) {
             console.error('Error: Token temporal expirado');
-            throw new Error('El token temporal ha expirado');
+            //throw new Error('El token temporal ha expirado');
+            return {
+                isValid: false,
+                shouldRetry: false,
+                remainingAttempts: 0,
+                message: 'El token temporal ha expirado'
+            };
         }
         console.error('Error inesperado durante la verificación 2FA:', error);
         throw error;
@@ -175,15 +188,17 @@ export async function verify2FA(
 }
 
 // Funciones auxiliares
-async function validateCredentials(usuario: string, pass: string): Promise<Usuario> {
+async function validateCredentials(usuario: string, pass: string): Promise<Usuario | null> {
     const user = await getUserByEmailOrUsername(usuario);
     if (!user) {
-        throw new Error('Credenciales inválidas');
+        //throw new Error('Credenciales inválidas');
+        return null;
     }
 
     const isPasswordCorrect = await bcrypt.compare(pass, user.pass);
     if (!isPasswordCorrect) {
-        throw new Error('Credenciales inválidas');
+        //throw new Error('Credenciales inválidas');
+        return null;
     }
 
     return user;
