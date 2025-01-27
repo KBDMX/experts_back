@@ -280,38 +280,26 @@ export const logUsuariosService = (req: Request, action: string, details: any = 
 // CREACIÓN AUTOMÁTICA DE BASE DE DATOS
 // ===========================================================
 export const createDatabaseIfNotExists = async (): Promise<void> => {
-    const tempSequelize = new Sequelize({
-        host: DB_HOST,
-        port: Number(DB_PORT),
-        username: DB_USER,
-        password: DB_PASSWORD,
-        database: 'postgres',
-        dialect: DB_DIALECT as any,
-        logging: false,
-    });
 
     try {
-        const [results]: any = await tempSequelize.query(
+        const [results]: any = await logsSequelize.query(
             `SELECT 1 FROM pg_database WHERE datname = 'logsdb'`
         );
 
         if (!results || results.length === 0) {
-            await tempSequelize.query(`CREATE DATABASE logsdb`);
+            await logsSequelize.query(`CREATE DATABASE logsdb`);
             console.log(`✅ Base de datos 'logsdb' creada exitosamente`);
         } else {
             console.log(`✅ Base de datos 'logsdb' ya existe`);
         }
+
+
     } catch (error) {
         console.error('❌ Error al crear/verificar la base de datos:', error);
     } finally {
-        await tempSequelize.close();
+        // await logsSequelize.close();
     }
-};
 
-// ===========================================================
-// SINCRONIZAR MODELOS
-// ===========================================================
-(async () => {
     try {
         await logsSequelize.authenticate();
         console.log('✅ Conexión establecida correctamente a logsdb');
@@ -327,4 +315,5 @@ export const createDatabaseIfNotExists = async (): Promise<void> => {
     } catch (error) {
         console.error('❌ Error durante la inicialización:', error);
     }
-})();
+};
+
