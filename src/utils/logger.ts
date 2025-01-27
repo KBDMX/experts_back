@@ -9,7 +9,7 @@ import { Request } from 'express';
 
 // (1) Conexión a logsDB (ya existente en tu código):
 const logsSequelize = new Sequelize(
-    process.env.URL_LOGS || 'postgres://' + DB_USER + ':' + DB_PASSWORD + '@' + DB_HOST + ':' + DB_PORT + '/' + (process.env.LOGS_DB_NAME || 'logsdb'),
+    process.env.URL_LOGS || 'postgres://' + DB_USER + ':' + DB_PASSWORD + '@' + DB_HOST + ':' + DB_PORT + '/logsdb',
     {
         dialect: DB_DIALECT as any,
         logging: false,
@@ -17,6 +17,9 @@ const logsSequelize = new Sequelize(
             freezeTableName: true,
             timestamps: false,
         },
+        dialectOptions: process.env.NODE_ENV === 'production'
+            ? { ssl: { require: true, rejectUnauthorized: false } }  // Solo en producción
+            : {},  // Sin SSL en local
     }
 );
 

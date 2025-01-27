@@ -20,8 +20,11 @@ const sequelize = new Sequelize({
     },
     dialectOptions: {
         ...(DB_DIALECT === 'mysql' && {}),
-        ...(DB_DIALECT === 'postgres' && {})
-    }
+        ...(DB_DIALECT === 'postgres' && {}),
+        ...(process.env.NODE_ENV === 'production')
+            ? { ssl: { require: true, rejectUnauthorized: false } }  // Solo en producción
+            : {},  // Sin SSL en local
+    },
 });
 
 // Exportamos una función para sincronizar
