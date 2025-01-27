@@ -9,7 +9,7 @@ import { Request } from 'express';
 
 // (1) Conexión a logsDB (ya existente en tu código):
 const logsSequelize = new Sequelize(
-    process.env.URL_LOGS || 'postgres://' + DB_USER + ':' + DB_PASSWORD + '@' + DB_HOST + ':' + DB_PORT + '/logsdb',
+    process.env.URL_LOGS || 'postgres://' + DB_USER + ':' + DB_PASSWORD + '@' + DB_HOST + ':' + DB_PORT + '/' + (process.env.LOGS_DB_NAME || 'logsdb'),
     {
         dialect: DB_DIALECT as any,
         logging: false,
@@ -283,11 +283,11 @@ export const createDatabaseIfNotExists = async (): Promise<void> => {
 
     try {
         const [results]: any = await logsSequelize.query(
-            `SELECT 1 FROM pg_database WHERE datname = 'logsdb'`
+            `SELECT 1 FROM pg_database WHERE datname = '${process.env.LOGS_DB_NAME || 'logsdb'}'`
         );
 
         if (!results || results.length === 0) {
-            await logsSequelize.query(`CREATE DATABASE logsdb`);
+            await logsSequelize.query(`CREATE DATABASE ${process.env.LOGS_DB_NAME || 'logsdb'}`);
             console.log(`✅ Base de datos 'logsdb' creada exitosamente`);
         } else {
             console.log(`✅ Base de datos 'logsdb' ya existe`);
