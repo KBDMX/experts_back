@@ -136,6 +136,12 @@
   ],
   "types": [
     "node",
-    "ioredis"
+    "express",
+    "cookie-parser",
+    "cors",
+    "bcrypt",
+    "nodemailer",
+    "swagger-jsdoc",
+    "swagger-ui-express"
   ]
 }
