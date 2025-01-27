@@ -8,19 +8,17 @@ import jwt from 'jsonwebtoken';
 import { Request } from 'express';
 
 // (1) Conexión a logsDB (ya existente en tu código):
-const logsSequelize = new Sequelize({
-    host: DB_HOST,
-    port: Number(DB_PORT),
-    username: DB_USER,
-    password: DB_PASSWORD,
-    database: 'logsDB',
-    dialect: DB_DIALECT as any,
-    logging: false,
-    define: {
-        freezeTableName: true,
-        timestamps: false,
-    },
-});
+const logsSequelize = new Sequelize(
+    process.env.URL_LOGS || 'postgres://' + DB_USER + ':' + DB_PASSWORD + '@' + DB_HOST + ':' + DB_PORT + '/logsdb',
+    {
+        dialect: DB_DIALECT as any,
+        logging: false,
+        define: {
+            freezeTableName: true,
+            timestamps: false,
+        },
+    }
+);
 
 // ===========================================================
 // MODELOS EXISTENTES
@@ -294,14 +292,14 @@ export const createDatabaseIfNotExists = async (): Promise<void> => {
 
     try {
         const [results]: any = await tempSequelize.query(
-            `SELECT 1 FROM pg_database WHERE datname = 'logsDB'`
+            `SELECT 1 FROM pg_database WHERE datname = 'logsdb'`
         );
 
         if (!results || results.length === 0) {
-            await tempSequelize.query(`CREATE DATABASE logsDB`);
-            console.log(`✅ Base de datos 'logsDB' creada exitosamente`);
+            await tempSequelize.query(`CREATE DATABASE logsdb`);
+            console.log(`✅ Base de datos 'logsdb' creada exitosamente`);
         } else {
-            console.log(`✅ Base de datos 'logsDB' ya existe`);
+            console.log(`✅ Base de datos 'logsdb' ya existe`);
         }
     } catch (error) {
         console.error('❌ Error al crear/verificar la base de datos:', error);
@@ -316,7 +314,7 @@ export const createDatabaseIfNotExists = async (): Promise<void> => {
 (async () => {
     try {
         await logsSequelize.authenticate();
-        console.log('✅ Conexión establecida correctamente a logsDB');
+        console.log('✅ Conexión establecida correctamente a logsdb');
         // Sincronizar logsDB
         await logsSequelize.sync({ alter: true });
 
