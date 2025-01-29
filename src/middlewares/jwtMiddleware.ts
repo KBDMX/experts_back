@@ -50,7 +50,7 @@ export const jwtMiddleware = async (err: any, req: any, res: Response, next: Nex
             res.cookie('access_token', newAccessToken, {
                 httpOnly: true,
                 secure: process.env.NODE_ENV === 'production',
-                sameSite: 'strict',
+                sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax', // Permite cross-origin cookies en producción
                 maxAge: 15 * 60 * 1000, // 15 minutos
             });
 

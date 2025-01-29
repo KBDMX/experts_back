@@ -43,6 +43,7 @@ const GuiaMadre = sequelize.define<Model<GuiaMadreAttributes, GuiaMadreCreationA
     },
     prestamo: {
         type: DataTypes.BOOLEAN,
+        defaultValue: false,
     },
     observaciones: {
         type: DataTypes.STRING,
@@ -52,6 +53,7 @@ const GuiaMadre = sequelize.define<Model<GuiaMadreAttributes, GuiaMadreCreationA
     },
     devolucion: {
         type: DataTypes.BOOLEAN,
+        defaultValue: false,
     },
     fecha_devolucion: {
         type: DataTypes.DATE,
