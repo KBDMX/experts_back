@@ -123,13 +123,12 @@ app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocs));
 
 app.use(
     cors({
-        origin: process.env.CLIENT_URL || 'http://localhost:3000', // URL del frontend
-        credentials: true, // Permite enviar cookies
-        methods: ['GET', 'POST', 'PUT', 'DELETE'],
+        origin: ['https://experts-front.vercel.app', process.env.CLIENT_URL || 'http://localhost:3000'],
+        credentials: true,
+        methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
         allowedHeaders: ['Content-Type', 'Authorization'],
     })
 );
-
 
 // Middleware JWT
 app.use(expressjwt({
