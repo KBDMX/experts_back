@@ -10,6 +10,7 @@ import { SECRET_KEY, BY_SALT, SECRET_REFRESH_KEY } from "@db/config";
 import { sendAuthCode } from '@services/usuarios/correo.servicio';
 import { UUID } from 'crypto';
 import Finca from '@models/usuarios/fincas.model';
+import { v4 as uuidv4 } from 'uuid';
 
 // Mapa de roles y sus tablas correspondientes
 const roleTableMap: { [key: string]: any } = {
@@ -230,7 +231,8 @@ async function generateAuthTokens(
 
     const refreshToken = jwt.sign(
         {
-            id_usuario: userId
+            id_usuario: userId,
+            session: uuidv4()
         },
         SECRET_REFRESH_KEY,
         { expiresIn: refreshTokenExpiresIn }

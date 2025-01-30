@@ -53,6 +53,7 @@ import { createDatabaseIfNotExists, logWithStore, parseAndStoreLog } from '@util
 
 import { xssProtection } from '@middlewares/xssProtection';
 import { sqlInjectionProtection } from '@middlewares/sqlInjectionProtection';
+import { smartRateLimit } from '@middlewares/rateLimit';
 
 
 
@@ -61,6 +62,7 @@ app.use(express.json());
 app.use(cookieParser());
 app.use(xssProtection());
 app.use(sqlInjectionProtection());
+app.use(smartRateLimit()); // ← Nueva línea agregada
 
 
 app.use((req: Request, res: Response, next: NextFunction) => {

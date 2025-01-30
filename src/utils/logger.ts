@@ -151,7 +151,8 @@ export const logWithStore = (data: any, store: 'app' | 'integrity') => {
                     meta: JSON.stringify(data.meta),
                     timestamp: new Date(),
                     hash: generateHash(data),
-                });
+                }
+                );
             }
         } catch (err) {
             console.error('❌ Error guardando log:', err);
