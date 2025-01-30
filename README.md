@@ -170,13 +170,13 @@ Se garantiza que la información solo sea accesible a las personas autorizadas. 
 
 Dentro de la carpeta register se encuentra el archivo page.tsx, donde se implementa una validación para garantizar que el usuario establezca una contraseña segura. Esta validación asegura que la contraseña cumpla con los siguientes requisitos: al menos una letra mayúscula, una letra minúscula, un número y un carácter especial.
 
-![contraseña segura](url-de-la-imagen)
+![contraseña segura](https://dev.azure.com/AppWebAvanzadas2024BKennyPinchao/2602ff21-7545-4e59-8f6b-f582f33d7786/_apis/git/repositories/e9d2b90b-e783-4222-844e-daa3909e73a7/items?path=/Img/Pantalla%20de%20registrarse.png&versionDescriptor%5BversionOptions%5D=0&versionDescriptor%5BversionType%5D=0&versionDescriptor%5Bversion%5D=main&resolveLfs=true&%24format=octetStream&api-version=5.0)
 
 #### 2. Autenticación: Cifrado de contraseñas y 2FA
 
 Tras el registro del usuario en la aplicación la contraseña del usuario es encriptada usando la librería bcrypt. Luego para el ingreso del usuario en la aplicación el usuario tiene que ingresar su contraseña, pero además se le solicita un código de verificación adicional que llega a su correo electrónico.
 
-![codigo de la autenticación](url-de-la-imagen)
+![codigo de la autenticación](https://dev.azure.com/AppWebAvanzadas2024BKennyPinchao/2602ff21-7545-4e59-8f6b-f582f33d7786/_apis/git/repositories/e9d2b90b-e783-4222-844e-daa3909e73a7/items?path=/Img/pantalla%20de%20codigo%20de%20verififcaci%C3%B3n.png&versionDescriptor%5BversionOptions%5D=0&versionDescriptor%5BversionType%5D=0&versionDescriptor%5Bversion%5D=main&resolveLfs=true&%24format=octetStream&api-version=5.0)
 
 La autenticación de dos factores se implementó de la siguiente manera:
 1. Redis: Se utilizó esta dependencia que simulará una base de datos en memoria para almacenar este token de segunda autenticación
@@ -193,7 +193,7 @@ En la carpeta documentos se implementa el servicio de integridad para los docume
 
 3. **Actualización y Regeneración del Hash**: Cuando se requiere actualizar un documento, se utiliza la función updateDocumentoBase, que actualiza el contenido del documento y genera un nuevo hash.
 
-![hasheo de archivos](url-de-la-imagen)
+![hasheo de archivos](https://dev.azure.com/AppWebAvanzadas2024BKennyPinchao/2602ff21-7545-4e59-8f6b-f582f33d7786/_apis/git/repositories/e9d2b90b-e783-4222-844e-daa3909e73a7/items?path=/Img/pantalla%20de%20logs.png&versionDescriptor%5BversionOptions%5D=0&versionDescriptor%5BversionType%5D=0&versionDescriptor%5Bversion%5D=main&resolveLfs=true&%24format=octetStream&api-version=5.0)
 
 ### Validación de datos de entrada
 
