@@ -11,6 +11,7 @@ import { sendAuthCode } from '@services/usuarios/correo.servicio';
 import { UUID } from 'crypto';
 import Finca from '@models/usuarios/fincas.model';
 import { v4 as uuidv4 } from 'uuid';
+import validator from 'validator';
 
 // Mapa de roles y sus tablas correspondientes
 const roleTableMap: { [key: string]: any } = {
@@ -25,7 +26,7 @@ const roleTableMap: { [key: string]: any } = {
 const twoFactorService = new TwoFactorAuthService();
 
 // Clave secreta específica para tokens temporales 2FA
-const TEMP_TOKEN_SECRET = process.env.TEMP_TOKEN_SECRET || 'your-temp-token-secret';
+const TEMP_TOKEN_SECRET = process.env.TEMP_TOKEN_SECRET!;
 
 // Interfaces
 interface TempTokenPayload {
@@ -358,8 +359,7 @@ async function getUserByEmailOrUsername(identifier: string): Promise<Usuario | n
 }
 
 function isEmail(identifier: string): boolean {
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    return emailRegex.test(identifier);
+    return validator.isEmail(identifier);
 }
 
 export default {
