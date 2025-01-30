@@ -160,7 +160,7 @@ El middleware implementado es el siguiente: `authorize.ts`
 * JWT (JSON Web Token): El código asume que el objeto req.auth contiene información sobre el usuario autenticado
 * Uso: La librería jsonwebtoken verifica y decodifica el token JWT para asignar la información del usuario autenticado a req.auth
 
-![cambio de roles](url-de-la-imagen)
+![cambio de roles](https://dev.azure.com/AppWebAvanzadas2024BKennyPinchao/2602ff21-7545-4e59-8f6b-f582f33d7786/_apis/git/repositories/e9d2b90b-e783-4222-844e-daa3909e73a7/items?path=/Img/Pantalla%20de%20cambio%20de%20roles.png&versionDescriptor%5BversionOptions%5D=0&versionDescriptor%5BversionType%5D=0&versionDescriptor%5Bversion%5D=main&resolveLfs=true&%24format=octetStream&api-version=5.0)
 
 ### Confidencialidad
 
